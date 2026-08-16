@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "tsBuildInfoFile": "../../node_modules/.cache/tsconfig.server.tsbuildinfo",
+    "strict": true,
+    "types": ["bun"]
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,25 @@
+@import 'tailwindcss';
+@import './base.css';
+@import './reduced-motion.css';
+
+@source '../';
+
+@theme static {
+  --font-sans: 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  --font-serif: 'Noto Serif SC', serif;
+  --color-ink: #18201d;
+  --color-muted: #68716c;
+  --color-paper: #eef1ee;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f5f7f5;
+  --color-line: #d5dcd7;
+  --color-dark: #151b18;
+  --color-green: #216248;
+  --color-green-soft: #e1eee7;
+  --color-red: #9b4038;
+  --color-red-soft: #f6e6e3;
+  --color-gold: #a77b35;
+  --color-blue: #45677c;
+  --color-blue-soft: #e5edf1;
+  --shadow-story: 0 18px 46px rgb(25 34 29 / 12%);
+}
