@@ -18,6 +18,17 @@ export function createRuntimeStateSchema(options: ContractSchemaOptions = defaul
     summary: z.string().trim().min(1).max(4_000),
     closedAt: timestampSchema,
   })
+  const longTermMemorySchema = z.object({
+    id: stateIdSchema,
+    fromMessageId: stateIdSchema,
+    toMessageId: stateIdSchema,
+    fromDepth: z.number().int().min(0),
+    toDepth: z.number().int().min(0),
+    messageCount: z.number().int().positive(),
+    summary: z.string().trim().min(1).max(4_000),
+    facts: z.array(z.string().trim().min(1).max(160)).max(12).default([]),
+    createdAt: timestampSchema,
+  })
   const abilityUseSchema = z.object({
     count: z.number().int().min(0),
     lastUsedAtMessageId: stateIdSchema.optional(),
@@ -62,6 +73,7 @@ export function createRuntimeStateSchema(options: ContractSchemaOptions = defaul
         .object({
           pinnedMemories: z.array(pinnedMemorySchema).max(50).optional(),
           chapterSummaries: z.array(chapterSummarySchema).max(50).optional(),
+          longTermMemories: z.array(longTermMemorySchema).max(50).optional(),
           abilityUses: z.record(stateIdSchema, abilityUseSchema).optional(),
           stateSuggestions: z.array(stateSuggestionSchema).max(50).optional(),
           nodeProgress: z.record(stateIdSchema, nodeProgressSchema).optional(),

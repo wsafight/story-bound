@@ -15,18 +15,18 @@ export function lintStoryDraft(input: StoryDraftInput): StoryLintIssue[] {
   const issues: StoryLintIssue[] = []
   const error = (path: string, message: string) => issues.push({ severity: 'error' as const, path, message })
   const warning = (path: string, message: string) => issues.push({ severity: 'warning' as const, path, message })
-  if (!input.summary) error('summary', '需要一句能说明故事吸引力的简介')
+  if (!input.summary) warning('summary', '建议补充一句能说明故事吸引力的简介')
   if (!input.background) error('background', '需要填写故事背景')
   if (!input.worldRules) error('worldRules', '需要填写世界规则或叙事约束')
-  if (input.characters.length === 0) error('characters', '至少需要一个人物')
+  if (input.characters.length === 0) warning('characters', '没有人物时会以旁白和玩家行动推进故事')
   input.characters.forEach((character, index) => {
     if (!character.name) error(`characters.${index}.name`, '人物需要名字')
     if (!character.identity) error(`characters.${index}.identity`, '人物需要身份说明')
   })
-  if (!input.playerTemplate.roleName) error('playerTemplate.roleName', '需要设置玩家在故事中的身份')
-  if (!input.playerTemplate.background) error('playerTemplate.background', '需要说明玩家背景')
-  if (!input.playerTemplate.goals) error('playerTemplate.goals', '需要设置玩家目标')
-  if (input.scenes.length === 0) error('scenes', '至少需要一个开场')
+  if (!input.playerTemplate.roleName) warning('playerTemplate.roleName', '建议设置玩家在故事中的身份')
+  if (!input.playerTemplate.background) warning('playerTemplate.background', '建议说明玩家背景')
+  if (!input.playerTemplate.goals) warning('playerTemplate.goals', '建议设置玩家目标')
+  if (input.scenes.length === 0) warning('scenes', '没有开场时会从故事前情自动创建默认开场')
   if (input.scenes.length > 0 && input.scenes.filter((scene) => scene.isDefault).length !== 1) {
     error('scenes', '必须且只能有一个默认开场')
   }

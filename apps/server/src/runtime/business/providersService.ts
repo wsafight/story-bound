@@ -32,6 +32,14 @@ export class StoryboundProvidersService extends Service {
     return this.repository.get(providerId)
   }
 
+  defaultSnapshot() {
+    try {
+      return this.repository.defaultSnapshot()
+    } catch {
+      throw new AppError(409, 'PROVIDER_MISSING', '请先配置模型 Provider')
+    }
+  }
+
   async health(providerId?: string, force = false) {
     const snapshot = providerId
       ? (() => {
@@ -39,7 +47,7 @@ export class StoryboundProvidersService extends Service {
           if (!provider) throw new AppError(404, 'PROVIDER_NOT_FOUND', '没有找到这个模型 Provider')
           return this.repository.snapshot(provider)
         })()
-      : this.repository.defaultSnapshot()
+      : this.defaultSnapshot()
     return this.llm.health(snapshot, { force })
   }
 

@@ -17,11 +17,15 @@ export async function streamPost(
     signal,
   })
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null
+    const payload = (await response.json().catch(() => null)) as {
+      error?: { code?: string; message?: string; requestId?: string }
+    } | null
+    const requestId = response.headers.get('x-storybound-request-id') || payload?.error?.requestId
     throw new ApiError(
       response.status,
       payload?.error?.code || 'REQUEST_FAILED',
       payload?.error?.message || '请求失败，请稍后重试',
+      requestId || undefined,
     )
   }
   if (!response.body) throw new ApiError(502, 'STREAM_UNAVAILABLE', '浏览器无法读取模型响应流')

@@ -8,6 +8,7 @@ import type {
   StoryFact,
   StoryNode,
 } from '@storybound/shared'
+import { createUuid } from '../../shared/id'
 
 export type EditorTab = 'basic' | 'characters' | 'player' | 'abilities' | 'state' | 'scenes'
 export type DraftCharacter = Character
@@ -42,7 +43,7 @@ export interface StoryDraft {
   playerTemplate: StoryDetail['playerTemplate']
 }
 
-const firstCharacterId = crypto.randomUUID()
+const firstCharacterId = createUuid()
 
 export const blankDraft: StoryDraft = {
   title: '',
@@ -77,7 +78,7 @@ export const blankDraft: StoryDraft = {
   declarativeMods: [],
   scenes: [
     {
-      id: crypto.randomUUID(),
+      id: createUuid(),
       title: '故事开始',
       description: '',
       location: '',
@@ -92,7 +93,7 @@ export const blankDraft: StoryDraft = {
     },
   ],
   playerTemplate: {
-    id: crypto.randomUUID(),
+    id: createUuid(),
     roleName: '',
     background: '',
     goals: '',

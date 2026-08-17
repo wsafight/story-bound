@@ -5,6 +5,7 @@ export class ApiError extends Error {
     public readonly status: number,
     public readonly code: string,
     message: string,
+    public readonly requestId?: string,
   ) {
     super(message)
   }
@@ -41,11 +42,13 @@ export async function api<Contract extends ApiContract>(
   })
   const payload = response.status === 204 ? undefined : await response.json().catch(() => null)
   if (!response.ok) {
-    const error = payload as { error?: { code?: string; message?: string } } | null
+    const error = payload as { error?: { code?: string; message?: string; requestId?: string } } | null
+    const requestId = response.headers.get('x-storybound-request-id') || error?.error?.requestId
     throw new ApiError(
       response.status,
       error?.error?.code || 'REQUEST_FAILED',
       error?.error?.message || '请求失败，请稍后重试',
+      requestId || undefined,
     )
   }
   const parsed = contract.response.safeParse(payload)

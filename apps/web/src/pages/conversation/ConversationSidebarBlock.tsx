@@ -27,12 +27,15 @@ export function ConversationSidebarBlock({
   const appManagedKeys = new Set([
     'pinnedMemories',
     'chapterSummaries',
+    'longTermMemories',
     'abilityUses',
     'stateSuggestions',
     'nodeProgress',
   ])
   const storyStateEntries = Object.entries(customState).filter(([key]) => !appManagedKeys.has(key))
   const pendingSuggestions = (customState.stateSuggestions || []).filter((item) => item.status === 'pending')
+  const longTermMemories = customState.longTermMemories || []
+  const recentFacts = longTermMemories.flatMap((item) => item.facts || []).slice(-3)
 
   return (
     <aside className="hidden min-h-0 min-w-0 overflow-y-auto border-l border-line bg-[#e8ede9] lg:block">
@@ -155,9 +158,16 @@ export function ConversationSidebarBlock({
         <h2 className="m-0 text-[11px] text-muted uppercase">章节与记忆</h2>
         <p className="m-0 text-xs text-green">{conversation.currentChapter?.title || '第一章'}</p>
         <small className="leading-[1.6] text-muted">
-          {conversation.state.custom?.pinnedMemories?.length || 0} 条固定记忆 ·{' '}
-          {conversation.state.custom?.chapterSummaries?.length || 0} 篇回顾
+          {customState.pinnedMemories?.length || 0} 条固定记忆 · {customState.chapterSummaries?.length || 0} 篇回顾 ·{' '}
+          {longTermMemories.length} 条长期记忆
         </small>
+        {recentFacts.length > 0 && (
+          <ul className="m-0 grid list-none gap-1 p-0 text-[11px] leading-[1.55] text-muted">
+            {recentFacts.map((fact) => (
+              <li key={fact}>{fact}</li>
+            ))}
+          </ul>
+        )}
         <button
           className={buttonClass('secondary', 'mt-1.5 w-full')}
           type="button"

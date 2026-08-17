@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "bun --watch src/index.ts",
+    "dev": "bun ../../scripts/dev-server.ts",
     "start": "NODE_ENV=production bun src/index.ts",
     "compile": "NODE_ENV=production bun build --compile --minify src/index.ts --outfile ../../build/storybound",
     "test": "bun test tests --isolate --max-concurrency 1",

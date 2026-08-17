@@ -58,6 +58,7 @@ export const apiContracts = {
       z.object({ report: storyImportReportSchema, story: storyDetailSchema.optional() }),
     ),
   createStory: () => contract('/api/story-cards', storyWithIssuesResponse),
+  generateStoryDraft: () => contract('/api/story-cards/generate', storyWithIssuesResponse),
   story: (storyId: string) => contract(`/api/story-cards/${storyId}`, storyResponse),
   storyEditor: (storyId: string) => contract(`/api/story-cards/${storyId}/editor`, storyResponse),
   updateStory: (storyId: string) => contract(`/api/story-cards/${storyId}`, storyWithIssuesResponse),

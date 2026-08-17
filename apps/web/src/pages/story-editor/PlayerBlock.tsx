@@ -14,14 +14,14 @@ export function PlayerBlock({ draft, onChange }: PlayerBlockProps) {
     <section className="max-w-[780px]">
       <EditorSectionHeader kicker="03 · 玩家身份" title="玩家以什么身份入戏？" />
       <div className={editorSingleFieldsClass}>
-        <label>
+        <label data-story-path="playerTemplate.roleName">
           <span>身份名称</span>
           <input
             value={draft.playerTemplate.roleName}
             onChange={(event) => updateTemplate({ roleName: event.target.value })}
           />
         </label>
-        <label>
+        <label data-story-path="playerTemplate.background">
           <span>背景与关系</span>
           <textarea
             rows={7}
@@ -29,7 +29,7 @@ export function PlayerBlock({ draft, onChange }: PlayerBlockProps) {
             onChange={(event) => updateTemplate({ background: event.target.value })}
           />
         </label>
-        <label>
+        <label data-story-path="playerTemplate.goals">
           <span>初始目标</span>
           <textarea
             rows={5}
@@ -37,7 +37,7 @@ export function PlayerBlock({ draft, onChange }: PlayerBlockProps) {
             onChange={(event) => updateTemplate({ goals: event.target.value })}
           />
         </label>
-        <label>
+        <label data-story-path="playerTemplate.defaultValues.name">
           <span>默认称呼</span>
           <input
             value={draft.playerTemplate.defaultValues.name || ''}

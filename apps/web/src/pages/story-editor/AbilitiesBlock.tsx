@@ -5,6 +5,7 @@ import {
   editorItemClass,
   editorItemHeaderClass,
 } from '../../components/forms/EditorSectionHeader'
+import { createUuid } from '../../shared/id'
 import { buttonClass, cx, emptyStateClass, ui } from '../../shared/ui'
 import { JsonField } from './JsonField'
 import type { DraftAbility, StoryDraft } from './types'
@@ -28,7 +29,7 @@ export function AbilitiesBlock({ draft, onChange, onUpdate }: AbilitiesBlockProp
           abilities: [
             ...draft.abilities,
             {
-              id: crypto.randomUUID(),
+              id: createUuid(),
               name: '',
               category: 'player',
               description: '',
@@ -53,7 +54,7 @@ export function AbilitiesBlock({ draft, onChange, onUpdate }: AbilitiesBlockProp
       {draft.abilities.length === 0 && <div className={emptyStateClass(true)}>这个故事暂时没有额外能力。</div>}
       <div className="grid gap-[17px]">
         {draft.abilities.map((ability, index) => (
-          <article className={editorItemClass} key={ability.id}>
+          <article className={editorItemClass} data-story-path={`abilities.${index}`} key={ability.id}>
             <header className={editorItemHeaderClass}>
               <span>{String(index + 1).padStart(2, '0')}</span>
               <strong>{ability.name || '未命名能力'}</strong>
@@ -73,11 +74,11 @@ export function AbilitiesBlock({ draft, onChange, onUpdate }: AbilitiesBlockProp
               </button>
             </header>
             <div className={editorFormGridClass}>
-              <label>
+              <label data-story-path={`abilities.${index}.name`}>
                 <span>名称</span>
                 <input value={ability.name} onChange={(event) => onUpdate(index, { name: event.target.value })} />
               </label>
-              <label>
+              <label data-story-path={`abilities.${index}.category`}>
                 <span>类别</span>
                 <select
                   value={ability.category}
@@ -88,7 +89,7 @@ export function AbilitiesBlock({ draft, onChange, onUpdate }: AbilitiesBlockProp
                   <option value="mechanic">故事机制</option>
                 </select>
               </label>
-              <label className="sm:col-span-2">
+              <label className="sm:col-span-2" data-story-path={`abilities.${index}.description`}>
                 <span>玩家可见说明</span>
                 <textarea
                   rows={3}
@@ -96,7 +97,7 @@ export function AbilitiesBlock({ draft, onChange, onUpdate }: AbilitiesBlockProp
                   onChange={(event) => onUpdate(index, { description: event.target.value })}
                 />
               </label>
-              <label className="sm:col-span-2">
+              <label className="sm:col-span-2" data-story-path={`abilities.${index}.prompt`}>
                 <span>注入模型的提示</span>
                 <textarea
                   rows={4}
@@ -104,7 +105,10 @@ export function AbilitiesBlock({ draft, onChange, onUpdate }: AbilitiesBlockProp
                   onChange={(event) => onUpdate(index, { prompt: event.target.value })}
                 />
               </label>
-              <label className="!flex !flex-row !items-center !gap-2 sm:col-span-2">
+              <label
+                className="!flex !flex-row !items-center !gap-2 sm:col-span-2"
+                data-story-path={`abilities.${index}.enabledByDefault`}
+              >
                 <input
                   className="!min-h-[17px] !w-[17px] accent-green"
                   type="checkbox"
@@ -113,7 +117,7 @@ export function AbilitiesBlock({ draft, onChange, onUpdate }: AbilitiesBlockProp
                 />
                 <span>新建存档时默认启用</span>
               </label>
-              <label>
+              <label data-story-path={`abilities.${index}.runtime.usesPerConversation`}>
                 <span>总使用次数</span>
                 <input
                   type="number"
@@ -130,7 +134,7 @@ export function AbilitiesBlock({ draft, onChange, onUpdate }: AbilitiesBlockProp
                   }
                 />
               </label>
-              <label>
+              <label data-story-path={`abilities.${index}.runtime.cooldownTurns`}>
                 <span>冷却轮数</span>
                 <input
                   type="number"

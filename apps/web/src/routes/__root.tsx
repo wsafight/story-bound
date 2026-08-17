@@ -1,5 +1,6 @@
 import { createRootRoute, Link, Navigate, Outlet } from '@tanstack/react-router'
 import { BookOpenText, Library, Settings } from 'lucide-react'
+import { ErrorBoundary, RootRouteErrorComponent } from '../components/ErrorBoundary'
 
 function AppFrame() {
   return (
@@ -40,7 +41,9 @@ function AppFrame() {
         </div>
       </header>
       <main>
-        <Outlet />
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   )
@@ -53,5 +56,6 @@ export const Route = createRootRoute({
       正在打开…
     </div>
   ),
+  errorComponent: RootRouteErrorComponent,
   notFoundComponent: () => <Navigate to="/" replace />,
 })

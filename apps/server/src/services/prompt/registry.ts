@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { defaultPromptTextProfile, stablePromptTextHash } from './profile'
 import type { PromptBlockScope, PromptBlockSource, PromptPriority } from './types'
 
 export interface PromptBlockDefinition {
@@ -213,8 +214,11 @@ export function promptScopeLabel(scope: PromptBlockScope) {
 
 export function getPromptProfileSnapshot() {
   const profile = {
-    id: 'storybound.default',
-    version: 1,
+    id: defaultPromptTextProfile.id,
+    version: defaultPromptTextProfile.version,
+    locale: defaultPromptTextProfile.locale,
+    textHash: stablePromptTextHash(defaultPromptTextProfile),
+    style: defaultPromptTextProfile.narrativeStyle,
     blockOrder: blocks.map((block) => block.id),
     blocks,
   }

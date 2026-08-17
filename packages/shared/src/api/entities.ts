@@ -12,6 +12,7 @@ const promptOmittedReasonSchema = z.enum([
   'disabled',
   'empty',
   'conflict_with_core_rule',
+  'short_term_window',
 ])
 
 export const characterSchema = z.object({
@@ -293,6 +294,13 @@ export const promptProfileSchema = z.object({
   id: z.string(),
   version: z.number(),
   hash: z.string(),
+  locale: z.string(),
+  textHash: z.string(),
+  style: z.object({
+    language: z.string(),
+    pacing: z.string(),
+    outputBoundaries: z.array(z.string()),
+  }),
   blockOrder: z.array(z.string()),
   blocks: z.array(promptBlockDefinitionSchema),
 })
@@ -366,8 +374,8 @@ export const replyCandidateComparisonSchema = z.object({
 export const recallDiagnosticItemSchema = z.object({
   id: z.string(),
   title: z.string(),
-  source: z.enum(['lorebook', 'pinned_memory', 'chapter_summary']),
-  boundary: z.enum(['background_lore', 'confirmed_memory', 'chapter_summary']),
+  source: z.enum(['lorebook', 'pinned_memory', 'chapter_summary', 'long_term_memory']),
+  boundary: z.enum(['background_lore', 'confirmed_memory', 'chapter_summary', 'long_term_memory']),
   matched: z.boolean(),
   relevanceScore: z.number(),
   matchedTerms: z.array(z.string()),
@@ -392,9 +400,9 @@ export const recallQualityReportSchema = z.object({
     fts5Ready: z.boolean(),
     sources: z.array(
       z.object({
-        id: z.enum(['lorebook', 'pinned_memory', 'chapter_summary']),
+        id: z.enum(['lorebook', 'pinned_memory', 'chapter_summary', 'long_term_memory']),
         label: z.string(),
-        boundary: z.enum(['background_lore', 'confirmed_memory', 'chapter_summary']),
+        boundary: z.enum(['background_lore', 'confirmed_memory', 'chapter_summary', 'long_term_memory']),
         engine: z.enum(['lexical']),
         fts5Ready: z.boolean(),
       }),
@@ -544,8 +552,11 @@ export const modelProviderSchema = z.object({
 export const modConfigFieldSchema = z.object({
   key: z.string(),
   label: z.string(),
-  type: z.enum(['select', 'boolean', 'character-select']),
+  type: z.enum(['select', 'boolean', 'character-select', 'number']),
   options: z.array(z.object({ value: z.string(), label: z.string() })).optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  step: z.number().optional(),
   visibleWhen: z.object({ key: z.string(), values: z.array(z.string()) }).optional(),
 })
 

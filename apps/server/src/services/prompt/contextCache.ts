@@ -1,4 +1,5 @@
 import { parseJson } from '../../repositories/conversations'
+import { defaultPromptTextProfile, renderApplicationRules } from './profile'
 import type { ContextEstimate, Row } from './types'
 
 const tokenEstimateCache = new Map<string, number>()
@@ -70,11 +71,7 @@ export function getStaticContext(conversationId: string, conversation: Row) {
   const story = parseJson<Record<string, any>>(cardRaw, {})
   const player = parseJson<Record<string, any>>(playerRaw, {})
   const model = parseJson<Record<string, any>>(modelRaw, {})
-  const application = [
-    '你正在主持一个单人互动故事。始终使用简体中文。',
-    '延续当前场景，尊重玩家已经做出的选择，不替玩家决定关键行动。',
-    '回复应包含具体可感知的环境、人物反应和一个自然的继续空间。不要输出规则说明、JSON、选项菜单或元评论。',
-  ].join('\n')
+  const application = renderApplicationRules(defaultPromptTextProfile)
   const world = [
     `故事：${story.title || ''}`,
     `背景：${story.background || ''}`,

@@ -66,6 +66,7 @@ describe('故事 MOD 运行时', () => {
       viewpointCharacterId: null,
       tense: 'present',
       length: 'balanced',
+      targetWords: 800,
       dialogueDensity: 'balanced',
     }
     expect(JSON.parse(conversation.mod_snapshot_json)['narrative-perspective'].config).toEqual(expected)
@@ -85,6 +86,7 @@ describe('故事 MOD 运行时', () => {
         viewpointCharacterId: 'char-shen-yan',
         tense: 'past',
         length: 'expanded',
+        targetWords: 1200,
         dialogueDensity: 'high',
       },
     }).id
@@ -106,6 +108,7 @@ describe('故事 MOD 运行时', () => {
     expect(prompt.system).toContain('玩家“测试玩家”仍是行动决策者')
     expect(prompt.system).toContain('过去时态')
     expect(prompt.system).toContain('五到八段')
+    expect(prompt.system).toContain('目标约 1200 字')
     expect(prompt.system).toContain('优先用有来有往的对白')
   })
 
@@ -124,6 +127,7 @@ describe('故事 MOD 运行时', () => {
           viewpointCharacterId: 'char-from-another-story',
           tense: 'present',
           length: 'balanced',
+          targetWords: 800,
           dialogueDensity: 'balanced',
         },
       }),
@@ -140,6 +144,7 @@ describe('故事 MOD 运行时', () => {
         viewpointCharacterId: null,
         tense: 'present',
         length: 'compact',
+        targetWords: 600,
         dialogueDensity: 'low',
       },
       expectedLeafMessageId: String(before.activeLeafMessageId),
@@ -165,6 +170,7 @@ describe('故事 MOD 运行时', () => {
     expect(oldPrompt.system).not.toContain('使用“我”描述玩家已经明确做出的行动')
     expect(newPrompt.system).toContain('使用“我”描述玩家已经明确做出的行动')
     expect(newPrompt.system).toContain('二到三段')
+    expect(newPrompt.system).toContain('目标约 600 字')
   })
 
   it('全局默认不接受依赖具体故事的人物视角', async () => {
@@ -175,6 +181,7 @@ describe('故事 MOD 运行时', () => {
           viewpointCharacterId: 'char-shen-yan',
           tense: 'present',
           length: 'balanced',
+          targetWords: 800,
           dialogueDensity: 'balanced',
         },
       }),

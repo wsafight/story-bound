@@ -21,6 +21,7 @@ export type PromptOmittedReason =
   | 'disabled'
   | 'empty'
   | 'conflict_with_core_rule'
+  | 'short_term_window'
 
 export interface PromptBlock {
   id: string
@@ -100,6 +101,20 @@ export interface ContextEstimate {
     actualInputTokens: number
     estimateErrorTokens: number
     estimateErrorRatio: number
+    measuredAt: string
+  }
+  contextLimitRetry?: {
+    reason: 'MODEL_CONTEXT_LIMIT'
+    retryCount: number
+    removedHistoryMessages: number
+    retainedHistoryMessages: number
+    removedHistoryMessageIds: string[]
+    estimatedTokensBefore: number
+    estimatedTokensAfter: number
+  }
+  assemblyMetrics?: {
+    dbQueryCount: number
+    durationMs: number
     measuredAt: string
   }
 }

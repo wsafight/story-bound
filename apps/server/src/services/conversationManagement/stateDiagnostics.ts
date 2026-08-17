@@ -8,6 +8,7 @@ type JsonRecord = Record<string, any>
 const appManagedCustomKeys = new Set([
   'pinnedMemories',
   'chapterSummaries',
+  'longTermMemories',
   'abilityUses',
   'stateSuggestions',
   'nodeProgress',

@@ -1,17 +1,21 @@
 import { Database } from 'bun:sqlite'
 import { beforeEach, describe, expect, it } from 'bun:test'
+import { generationStreamEventSchema } from '@storybound/shared'
 
 const { db } = await import('../src/db/connection')
+const { initializeDatabase } = await import('../src/db/initialize')
 const { initializeCurrentSchema } = await import('../src/db/schema')
 const { seedBuiltInStories } = await import('../src/db/seed')
 const { storyDraftSchema } = await import('../src/domain/schemas')
+const { ModelProviderError } = await import('../src/llm/modelTypes')
 const { seedDefaultModelProvider } = await import('../src/repositories/modelProviders')
-const { getConversationView } = await import('../src/repositories/conversations')
+const { getConversationView, getGenerationRow } = await import('../src/repositories/conversations')
 const { getStory, listStoryConversations } = await import('../src/repositories/stories')
 const { createBackup, getBackupPath, listBackups, restoreBackup } = await import('../src/services/backupService')
 const {
   closeChapter,
   createStateSuggestion,
+  evaluateRecallBenchmark,
   exportConversationMarkdown,
   forkConversation,
   getConversationBranches,
@@ -29,13 +33,20 @@ const {
   useConversationAbility,
 } = await import('../src/services/conversationManagementService')
 const { createConversation } = await import('../src/services/conversationService')
-const { prepareSend } = await import('../src/services/generationService')
+const { prepareRegenerate, prepareSend, runGeneration } = await import('../src/services/generationService')
 const { buildModelMessages } = await import('../src/services/promptBuilder')
 const { auditPromptProfile, evaluatePromptGoldenSnapshot, getPromptProfile } = await import(
   '../src/services/promptService'
 )
-const { duplicateStory, exportStoryPackage, importStoryPackage, inspectStoryImport, publishStory, updateStoryDraft } =
-  await import('../src/services/storyEditorService')
+const {
+  createStoryDraft,
+  duplicateStory,
+  exportStoryPackage,
+  importStoryPackage,
+  inspectStoryImport,
+  publishStory,
+  updateStoryDraft,
+} = await import('../src/services/storyEditorService')
 const { detectStoryImportFormat, normalizeStoryImport, storyImportAdapters } = await import(
   '../src/services/storyEditor/importAdapters'
 )
@@ -185,10 +196,270 @@ function createStructuredStory() {
 }
 
 describe('产品管理与本地缓存支撑能力', () => {
+  it('允许只有前情和设定的故事发布，并从默认开场创建存档', () => {
+    const draft = storyDraftSchema.parse({
+      title: '雾港来信',
+      background: '三年前寄出的信在今夜抵达雾港，信封上的邮戳来自尚未建成的车站。',
+      worldRules: '叙事必须遵守玩家行动，不替玩家做决定；未知事实只能通过调查逐步揭示。',
+    })
+    const story = createStoryDraft(draft)
+    const issues = publishStory(String(story.id)).issues
+    expect(issues.some((issue) => issue.severity === 'error')).toBe(false)
+    expect(issues.find((issue) => issue.path === 'scenes')?.severity).toBe('warning')
+
+    const conversationId = createConversation(String(story.id), {
+      title: '雾港来信 · 新存档',
+      player: { name: '林舟', pronouns: '不限定', note: '' },
+      abilityIds: [],
+    }).id
+    const conversation = getConversationView(conversationId)!
+
+    expect(conversation.scene).toMatchObject({
+      title: '默认开场',
+      location: '雾港来信',
+      time: '故事开始',
+      openingSender: 'narrator',
+    })
+    expect(conversation.state).toMatchObject({
+      phase: '故事开始',
+      scene: { location: '雾港来信', time: '故事开始', participantIds: [] },
+      custom: {},
+    })
+    expect(conversation.messages).toHaveLength(1)
+    expect(conversation.messages[0]).toMatchObject({
+      sender: 'narrator',
+      content: draft.background,
+    })
+  })
+
+  it('服务启动时把遗留活跃生成标记为失败，并保留玩家消息和检查点', () => {
+    const acceptedConversationId = createTestConversation('启动恢复 accepted')
+    const acceptedBefore = activePointers(acceptedConversationId)
+    const accepted = prepareSend(acceptedConversationId, {
+      clientMessageId: crypto.randomUUID(),
+      expectedLeafMessageId: acceptedBefore.expectedLeafMessageId,
+      content: '触发 accepted 遗留任务',
+      inputMode: 'action',
+    })
+
+    const streamingConversationId = createTestConversation('启动恢复 streaming')
+    const streamingBefore = activePointers(streamingConversationId)
+    const streaming = prepareSend(streamingConversationId, {
+      clientMessageId: crypto.randomUUID(),
+      expectedLeafMessageId: streamingBefore.expectedLeafMessageId,
+      content: '触发 streaming 遗留任务',
+      inputMode: 'action',
+    })
+    db.query("UPDATE generations SET status = 'streaming', started_at = ? WHERE id = ?").run(
+      new Date().toISOString(),
+      streaming.id,
+    )
+
+    initializeDatabase()
+
+    for (const generationId of [accepted.id, streaming.id]) {
+      expect(getGenerationRow(generationId)).toMatchObject({
+        status: 'failed',
+        error_code: 'SERVER_RESTARTED',
+      })
+      expect(getGenerationRow(generationId)?.finished_at).toBeTruthy()
+    }
+
+    const acceptedConversation = getConversationView(acceptedConversationId)!
+    expect(acceptedConversation.activeGeneration).toBeNull()
+    expect(acceptedConversation.activeCheckpointId).toBe(acceptedBefore.expectedCheckpointId)
+    expect(acceptedConversation.messages.map((message) => message.id)).toContain(accepted.playerMessageId)
+
+    const streamingConversation = getConversationView(streamingConversationId)!
+    expect(streamingConversation.activeGeneration).toBeNull()
+    expect(streamingConversation.activeCheckpointId).toBe(streamingBefore.expectedCheckpointId)
+    expect(streamingConversation.messages.map((message) => message.id)).toContain(streaming.playerMessageId)
+  })
+
+  it('生成服务发出的 SSE 事件都能被共享判别联合解析，并拒绝未知事件', async () => {
+    const completedConversationId = createTestConversation('SSE completed 契约')
+    const completedBefore = activePointers(completedConversationId)
+    const completedPrepared = prepareSend(completedConversationId, {
+      clientMessageId: crypto.randomUUID(),
+      expectedLeafMessageId: completedBefore.expectedLeafMessageId,
+      content: '推进到完成事件',
+      inputMode: 'action',
+    })
+    const completedEvents: string[] = []
+    await runGeneration(
+      completedPrepared,
+      (event) => {
+        expect(generationStreamEventSchema.safeParse(event).success).toBe(true)
+        completedEvents.push(event.event)
+      },
+      {
+        stream: async function* () {
+          yield { type: 'text' as const, text: '雨声停在门外。' }
+          yield { type: 'finish' as const, reason: 'stop' }
+        },
+      },
+    )
+    expect(completedEvents).toEqual(['accepted', 'delta', 'completed'])
+
+    const failedConversationId = createTestConversation('SSE error 契约')
+    const failedBefore = activePointers(failedConversationId)
+    const failedPrepared = prepareSend(failedConversationId, {
+      clientMessageId: crypto.randomUUID(),
+      expectedLeafMessageId: failedBefore.expectedLeafMessageId,
+      content: '推进到错误事件',
+      inputMode: 'action',
+    })
+    const failedEvents: string[] = []
+    await runGeneration(
+      failedPrepared,
+      (event) => {
+        expect(generationStreamEventSchema.safeParse(event).success).toBe(true)
+        failedEvents.push(event.event)
+      },
+      {
+        stream: async function* () {
+          throw new Error('network unavailable')
+        },
+      },
+    )
+    expect(failedEvents).toEqual(['accepted', 'error'])
+    expect(generationStreamEventSchema.safeParse({ event: 'unknown', data: {} }).success).toBe(false)
+  })
+
+  it('乐观锁和 operationId 幂等保护生成竞态', async () => {
+    const staleSendConversationId = createTestConversation('过期 leaf 发送')
+    const staleBefore = activePointers(staleSendConversationId)
+    prepareSend(staleSendConversationId, {
+      clientMessageId: crypto.randomUUID(),
+      expectedLeafMessageId: staleBefore.expectedLeafMessageId,
+      content: '先保存一条玩家消息',
+      inputMode: 'action',
+    })
+    expect(() =>
+      prepareSend(staleSendConversationId, {
+        clientMessageId: crypto.randomUUID(),
+        expectedLeafMessageId: staleBefore.expectedLeafMessageId,
+        content: '使用过期 leaf 再发送',
+        inputMode: 'action',
+      }),
+    ).toThrow('剧情已在其他位置更新')
+
+    const staleCheckpointConversationId = createTestConversation('过期 checkpoint 状态')
+    const checkpointBefore = activePointers(staleCheckpointConversationId)
+    togglePinnedMemory(staleCheckpointConversationId, {
+      messageId: checkpointBefore.expectedLeafMessageId,
+      ...checkpointBefore,
+    })
+    expect(() =>
+      updateConversationState(staleCheckpointConversationId, {
+        custom: {},
+        ...checkpointBefore,
+      }),
+    ).toThrow('剧情已经变化')
+
+    const regenerateConversationId = createTestConversation('重新生成幂等')
+    const sendBefore = activePointers(regenerateConversationId)
+    const prepared = prepareSend(regenerateConversationId, {
+      clientMessageId: crypto.randomUUID(),
+      expectedLeafMessageId: sendBefore.expectedLeafMessageId,
+      content: '请求第一版回复',
+      inputMode: 'dialogue',
+    })
+    await runGeneration(prepared, () => undefined, {
+      stream: async function* () {
+        yield { type: 'text' as const, text: '第一版回复。' }
+        yield { type: 'finish' as const, reason: 'stop' }
+      },
+    })
+    const firstReplyId = String(getConversationView(regenerateConversationId)?.activeLeafMessageId)
+    const operationId = crypto.randomUUID()
+    const firstRegenerate = prepareRegenerate(regenerateConversationId, {
+      operationId,
+      expectedLeafMessageId: firstReplyId,
+    })
+    const duplicateRegenerate = prepareRegenerate(regenerateConversationId, {
+      operationId,
+      expectedLeafMessageId: firstReplyId,
+    })
+    expect(duplicateRegenerate).toMatchObject({
+      id: firstRegenerate.id,
+      playerMessageId: firstRegenerate.playerMessageId,
+      duplicate: true,
+    })
+    expect(() =>
+      prepareRegenerate(regenerateConversationId, {
+        operationId,
+        expectedLeafMessageId: 'different-leaf',
+      }),
+    ).toThrow('操作编号已经用于其他请求')
+    expect(() =>
+      prepareRegenerate(regenerateConversationId, {
+        operationId: crypto.randomUUID(),
+        expectedLeafMessageId: firstReplyId,
+      }),
+    ).toThrow('当前对话正在生成回复')
+  })
+
+  it('Provider 报上下文超限时最多清理历史并自动重试一次', async () => {
+    const conversationId = createTestConversation('上下文降级重试')
+    const firstBefore = activePointers(conversationId)
+    const first = prepareSend(conversationId, {
+      clientMessageId: crypto.randomUUID(),
+      expectedLeafMessageId: firstBefore.expectedLeafMessageId,
+      content: '先推进一轮，制造可裁剪历史。',
+      inputMode: 'action',
+    })
+    await runGeneration(first, () => undefined, {
+      stream: async function* () {
+        yield { type: 'text' as const, text: '第一轮回复。' }
+        yield { type: 'finish' as const, reason: 'stop' }
+      },
+    })
+
+    const secondBefore = activePointers(conversationId)
+    const second = prepareSend(conversationId, {
+      clientMessageId: crypto.randomUUID(),
+      expectedLeafMessageId: secondBefore.expectedLeafMessageId,
+      content: '触发上下文超限重试。',
+      inputMode: 'action',
+    })
+    const messageCounts: number[] = []
+    const events: string[] = []
+    let attempts = 0
+    await runGeneration(second, (event) => events.push(event.event), {
+      stream: async function* (input) {
+        attempts += 1
+        messageCounts.push(input.messages.length)
+        if (attempts === 1) {
+          throw new ModelProviderError('MODEL_CONTEXT_LIMIT', '当前上下文超过模型限制', false)
+        }
+        yield { type: 'text' as const, text: '降级后回复。' }
+        yield { type: 'finish' as const, reason: 'stop' }
+      },
+    })
+
+    expect(attempts).toBe(2)
+    expect(messageCounts[0]).toBeGreaterThan(1)
+    expect(messageCounts[1]).toBe(1)
+    expect(events).toEqual(['accepted', 'delta', 'completed'])
+    const generation = getGenerationRow(second.id)!
+    const estimate = JSON.parse(String(generation.context_estimate_json)) as Record<string, any>
+    expect(estimate.contextLimitRetry).toMatchObject({
+      reason: 'MODEL_CONTEXT_LIMIT',
+      retryCount: 1,
+      removedHistoryMessages: messageCounts[0] - 1,
+      retainedHistoryMessages: 0,
+    })
+    expect(JSON.stringify(estimate.contextLimitRetry)).not.toContain('先推进一轮')
+  })
+
   it('Prompt profile 集中描述 block 顺序、预算和快照版本', async () => {
     const profile = getPromptProfile()
     expect(profile.id).toBe('storybound.default')
     expect(profile.hash).toMatch(/^[a-f0-9]{64}$/)
+    expect(profile.locale).toBe('zh-CN')
+    expect(profile.textHash).toMatch(/^[a-f0-9]{64}$/)
+    expect(profile.style.outputBoundaries).toContain('不要替玩家决定关键行动。')
     expect(profile.blockOrder).toContain('story.lorebook.matched')
     expect(profile.blocks.find((block) => block.id === 'story.lorebook.matched')).toMatchObject({
       title: '世界书资料',
@@ -214,6 +485,11 @@ describe('产品管理与本地缓存支撑能力', () => {
       version: profile.version,
       hash: profile.hash,
     })
+    expect(typeof prompt.contextEstimate.assemblyMetrics?.dbQueryCount).toBe('number')
+    expect(typeof prompt.contextEstimate.assemblyMetrics?.durationMs).toBe('number')
+    expect(typeof prompt.contextEstimate.assemblyMetrics?.measuredAt).toBe('string')
+    expect(prompt.contextEstimate.assemblyMetrics?.dbQueryCount).toBeGreaterThan(0)
+    expect(JSON.stringify(prompt.contextEstimate.assemblyMetrics)).not.toContain('检查 prompt profile')
   })
 
   it('Prompt golden tests 锁定真实组装顺序和动态召回块', async () => {
@@ -272,8 +548,63 @@ describe('产品管理与本地缓存支撑能力', () => {
       inputMode: 'action',
     })
     const prompt = await buildModelMessages(conversationId, prepared.playerMessageId)
-    expect(prompt.system).toContain('已确认的章节回顾与固定记忆')
+    expect(prompt.system).toContain('已确认的长期记忆、章节回顾与固定记忆')
     expect(prompt.system).toContain('你比时刻表晚了三年')
+  })
+
+  it('每个故事的新存档都默认带上空的固定记忆和长期记忆', () => {
+    const conversationId = createTestConversation('默认记忆存档')
+    const conversation = getConversationView(conversationId)!
+    expect(conversation.state.custom?.pinnedMemories).toEqual([])
+    expect(conversation.state.custom?.longTermMemories).toEqual([])
+  })
+
+  it('超过六轮后把旧路径压缩为长期记忆，并只保留最近两轮完整原文', async () => {
+    const conversationId = createTestConversation('长期记忆存档')
+    const longRoundTwo = `第2轮模型回复，推进线索2。${'旧回复细节，'.repeat(20)}不能整段反复提交给模型。`
+    for (let index = 1; index <= 7; index += 1) {
+      const before = activePointers(conversationId)
+      const prepared = prepareSend(conversationId, {
+        clientMessageId: crypto.randomUUID(),
+        expectedLeafMessageId: before.expectedLeafMessageId,
+        content: `第${index}轮玩家行动，记录线索${index}`,
+        inputMode: 'action',
+      })
+      await runGeneration(prepared, () => undefined, {
+        stream: async function* () {
+          yield {
+            type: 'text' as const,
+            text: index === 2 ? longRoundTwo : `第${index}轮模型回复，推进线索${index}`,
+          }
+          yield { type: 'finish' as const, reason: 'stop' }
+        },
+      })
+    }
+
+    const conversation = getConversationView(conversationId)!
+    const longTermMemories = conversation.state.custom?.longTermMemories || []
+    expect(longTermMemories.length).toBeGreaterThan(0)
+    expect(longTermMemories[0].facts.join(' ')).toContain('第1轮玩家行动')
+    expect(longTermMemories[0].summary).toContain('第1轮')
+
+    const beforeNext = activePointers(conversationId)
+    const prepared = prepareSend(conversationId, {
+      clientMessageId: crypto.randomUUID(),
+      expectedLeafMessageId: beforeNext.expectedLeafMessageId,
+      content: '第8轮玩家行动，检查短期上下文',
+      inputMode: 'action',
+    })
+    const prompt = await buildModelMessages(conversationId, prepared.playerMessageId)
+    const historyBlock = prompt.contextEstimate.promptSnapshot?.blocks.find((block) => block.id === 'history.path')
+
+    expect(prompt.contextEstimate.history.includedMessages).toBeLessThanOrEqual(12)
+    expect(prompt.contextEstimate.history.omittedMessages).toBeGreaterThan(0)
+    expect(historyBlock).toMatchObject({ reason: 'short_term_window' })
+    expect(prompt.system).toContain('已确认的长期记忆、章节回顾与固定记忆')
+    expect(prompt.system).toContain('第1轮玩家行动')
+    expect(JSON.stringify(prompt.messages)).not.toContain('第1轮玩家行动')
+    expect(JSON.stringify(prompt.messages)).not.toContain('不能整段反复提交给模型')
+    expect(JSON.stringify(prompt.messages)).toContain('第2轮模型回复，推进线索2')
   })
 
   it('上下文估算暴露每段提示词的来源、作用域和预算', async () => {
@@ -922,7 +1253,12 @@ describe('产品管理与本地缓存支撑能力', () => {
       active: 'lexical',
       fts5Ready: true,
     })
-    expect(recall.engine.sources.map((source) => source.id)).toEqual(['lorebook', 'pinned_memory', 'chapter_summary'])
+    expect(recall.engine.sources.map((source) => source.id)).toEqual([
+      'lorebook',
+      'pinned_memory',
+      'long_term_memory',
+      'chapter_summary',
+    ])
     expect(recall.diagnostics.find((item) => item.source === 'lorebook')).toMatchObject({
       boundary: 'background_lore',
       matched: true,
@@ -935,6 +1271,60 @@ describe('产品管理与本地缓存支撑能力', () => {
       boundary: 'chapter_summary',
       matched: true,
     })
+
+    const miss = getRecallDiagnostics(conversationId, 'zzqv-unmatched baseline')
+    const lexicalMemoryMisses = miss.diagnostics.filter((item) => item.source !== 'lorebook')
+    expect(lexicalMemoryMisses.every((item) => item.matchedTerms.length === 0)).toBe(true)
+    expect(lexicalMemoryMisses.every((item) => !item.matched)).toBe(true)
+  })
+
+  it('召回 benchmark 统计固定语料的 Recall@K、漏召和误召回', () => {
+    const story = createStructuredStory()
+    const conversationId = createConversation(String(story.id), {
+      title: '召回 benchmark 存档',
+      sceneId: String(story.scenes[0].id),
+      player: { name: '测试玩家', pronouns: '不限定', note: '' },
+      abilityIds: [],
+    }).id
+    const before = activePointers(conversationId)
+    const pinned = togglePinnedMemory(conversationId, {
+      messageId: before.expectedLeafMessageId,
+      ...before,
+    })
+    closeChapter(conversationId, {
+      title: '事故余波',
+      summary: '玩家确认槐安站事故与三年前的末班车有关。',
+      expectedLeafMessageId: before.expectedLeafMessageId,
+      expectedCheckpointId: pinned.activeCheckpointId,
+    })
+
+    const report = evaluateRecallBenchmark(conversationId, [
+      {
+        id: 'single-hop-station',
+        query: '槐安站 三年 末班车',
+        expected: [
+          { source: 'lorebook', title: '槐安站事故' },
+          { source: 'pinned_memory', title: '固定记忆 1' },
+          { source: 'chapter_summary', title: '事故余波' },
+        ],
+      },
+      {
+        id: 'no-answer-memory-negative',
+        query: 'zzqv-unmatched baseline',
+        expected: [],
+        ignoredUnexpectedSources: ['lorebook'],
+      },
+    ])
+
+    expect(report.summary).toMatchObject({
+      totalCases: 2,
+      expectedCount: 3,
+      matchedExpectedCount: 3,
+      missedExpectedCount: 0,
+      unexpectedMatchCount: 0,
+      recallAtK: 1,
+    })
+    expect(report.cases.every((item) => item.missedExpected.length === 0)).toBe(true)
   })
 
   it('节点机会池不会把已完成节点继续注入提示词', async () => {

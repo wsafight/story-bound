@@ -1,6 +1,7 @@
 import { apiContracts } from '@storybound/shared'
 import { createFileRoute } from '@tanstack/react-router'
 import { prefetchApiQuery } from '../app/apiQueries'
+import { ConversationRouteErrorComponent } from '../components/ErrorBoundary'
 import { ConversationPage } from '../pages/ConversationPage'
 
 export const Route = createFileRoute('/conversations/$conversationId')({
@@ -10,4 +11,5 @@ export const Route = createFileRoute('/conversations/$conversationId')({
       prefetchApiQuery(apiContracts.conversationModelHealth(params.conversationId), 15_000),
     ]),
   component: ConversationPage,
+  errorComponent: ConversationRouteErrorComponent,
 })

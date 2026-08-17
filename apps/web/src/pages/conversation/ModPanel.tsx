@@ -14,7 +14,7 @@ interface ModPanelProps {
   updatingMod: string | null
   onClose: () => void
   onApply: (mod: ConversationMod, enabled?: boolean) => void
-  onDraftChange: (mod: ConversationMod, field: ModConfigField, value: string | boolean) => void
+  onDraftChange: (mod: ConversationMod, field: ModConfigField, value: string | boolean | number) => void
 }
 
 function isFieldVisible(field: ModConfigField, config: Record<string, unknown>) {
@@ -72,6 +72,25 @@ export function ModPanel({
                               onChange={(event) => onDraftChange(mod, field, event.target.checked)}
                             />
                             <span>{field.label}</span>
+                          </label>
+                        )
+                      if (field.type === 'number')
+                        return (
+                          <label className="grid gap-[5px]" key={field.key}>
+                            <span className="text-[10px] font-bold text-muted">{field.label}</span>
+                            <input
+                              className="min-h-9 w-full rounded border border-line bg-surface px-2.5 text-[11px] outline-none focus:border-green"
+                              type="number"
+                              min={field.min}
+                              max={field.max}
+                              step={field.step || 1}
+                              value={Number(draftConfig[field.key] ?? field.min ?? 0)}
+                              disabled={!mod.enabled || Boolean(generationId)}
+                              onChange={(event) => {
+                                const value = event.target.valueAsNumber
+                                onDraftChange(mod, field, Number.isFinite(value) ? value : field.min || 0)
+                              }}
+                            />
                           </label>
                         )
                       const options =

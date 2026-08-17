@@ -52,7 +52,10 @@ describe('浏览器 API 请求', () => {
   it('把服务端错误转换为 ApiError', async () => {
     globalThis.fetch = (() =>
       Promise.resolve(
-        Response.json({ error: { code: 'NOT_FOUND', message: '不存在' } }, { status: 404 }),
+        Response.json(
+          { error: { code: 'NOT_FOUND', message: '不存在', requestId: 'body-request-id' } },
+          { status: 404, headers: { 'x-storybound-request-id': 'header-request-id' } },
+        ),
       )) as typeof fetch
 
     try {
@@ -61,6 +64,7 @@ describe('浏览器 API 请求', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(ApiError)
       expect((error as ApiError).code).toBe('NOT_FOUND')
+      expect((error as ApiError).requestId).toBe('header-request-id')
     }
   })
 

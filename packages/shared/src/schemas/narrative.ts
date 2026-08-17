@@ -8,6 +8,7 @@ export const narrativePreferencesSchema = z
     viewpointCharacterId: z.string().min(1).nullable().default(null),
     tense: z.enum(['present', 'past']).default('present'),
     length: z.enum(['compact', 'balanced', 'expanded']).default('balanced'),
+    targetWords: z.coerce.number().int().min(100).max(3000).default(800),
     dialogueDensity: z.enum(['low', 'balanced', 'high']).default('balanced'),
   })
   .superRefine((value, context) => {

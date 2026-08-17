@@ -1,7 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Express } from 'express'
-import { createConversationSchema, storyDraftSchema } from '../../domain/schemas'
+import { createConversationSchema, generateStoryDraftSchema, storyDraftSchema } from '../../domain/schemas'
 import { AppError } from '../../shared/errors'
+import { acquirePermit } from './generationStream'
 import { routeParam } from './helpers'
 
 export function registerStoryRoutes(app: Express, ctx: Context) {
@@ -18,6 +19,21 @@ export function registerStoryRoutes(app: Express, ctx: Context) {
     const draft = storyDraftSchema.parse(req.body)
     const story = ctx.stories.create(draft)
     res.status(201).json({ story, issues: ctx.stories.lint(storyDraftSchema.parse(story)) })
+  })
+  app.post('/api/story-cards/generate', async (req, res) => {
+    const release = acquirePermit(ctx)
+    const controller = new AbortController()
+    const abort = () => {
+      if (!res.writableEnded) controller.abort()
+    }
+    res.on('close', abort)
+    try {
+      const result = await ctx.stories.generate(generateStoryDraftSchema.parse(req.body), controller.signal)
+      res.status(201).json(result)
+    } finally {
+      res.off('close', abort)
+      release()
+    }
   })
   app.get('/api/story-cards/:id', (req, res) => {
     const story = ctx.stories.get(routeParam(req, 'id'))

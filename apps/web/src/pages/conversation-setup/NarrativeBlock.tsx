@@ -83,6 +83,17 @@ export function NarrativeBlock({ story, draft, onChange }: NarrativeSectionProps
           </select>
         </label>
         <label>
+          <span>目标字数</span>
+          <input
+            type="number"
+            min={100}
+            max={3000}
+            step={50}
+            value={draft.narrative.targetWords}
+            onChange={(event) => updateNarrative({ targetWords: Number(event.target.value || 800) })}
+          />
+        </label>
+        <label>
           <span>对白密度</span>
           <select
             value={draft.narrative.dialogueDensity}

@@ -66,4 +66,23 @@ describe('浏览器生成流协议', () => {
       expect((error as ApiError).code).toBe('STREAM_CLOSED')
     }
   })
+
+  it('把流式接口错误中的 requestId 带入 ApiError', async () => {
+    globalThis.fetch = (() =>
+      Promise.resolve(
+        Response.json(
+          { error: { code: 'MODEL_BUSY', message: '模型正忙', requestId: 'body-request-id' } },
+          { status: 429, headers: { 'x-storybound-request-id': 'stream-request-id' } },
+        ),
+      )) as typeof fetch
+
+    try {
+      await streamPost('/test', {}, () => undefined)
+      throw new Error('expected streamPost to fail')
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApiError)
+      expect((error as ApiError).code).toBe('MODEL_BUSY')
+      expect((error as ApiError).requestId).toBe('stream-request-id')
+    }
+  })
 })

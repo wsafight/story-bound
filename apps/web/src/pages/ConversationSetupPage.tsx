@@ -24,7 +24,14 @@ const narrativeDefaults: NarrativePreferences = {
   viewpointCharacterId: null,
   tense: 'present',
   length: 'balanced',
+  targetWords: 800,
   dialogueDensity: 'balanced',
+}
+
+function restoreTargetWords(value: unknown) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return narrativeDefaults.targetWords
+  return Math.min(3000, Math.max(100, Math.round(numeric)))
 }
 
 function restoreNarrative(value: unknown, story: StoryDetail): NarrativePreferences {
@@ -51,6 +58,7 @@ function restoreNarrative(value: unknown, story: StoryDetail): NarrativePreferen
       : null,
     tense: raw.tense === 'past' ? 'past' : 'present',
     length: raw.length === 'compact' || raw.length === 'expanded' ? raw.length : 'balanced',
+    targetWords: restoreTargetWords(raw.targetWords),
     dialogueDensity: raw.dialogueDensity === 'low' || raw.dialogueDensity === 'high' ? raw.dialogueDensity : 'balanced',
   }
 }
@@ -161,7 +169,7 @@ export function ConversationSetupPage() {
     try {
       const payload = createConversationSchema.parse({
         title: draft.title,
-        sceneId: draft.sceneId,
+        sceneId: draft.sceneId || undefined,
         providerId: draft.providerId || undefined,
         player: { name: draft.name, pronouns: draft.pronouns, note: draft.note },
         abilityIds: draft.abilityIds,

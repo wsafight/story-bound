@@ -6,6 +6,7 @@ import {
   editorItemClass,
   editorItemHeaderClass,
 } from '../../components/forms/EditorSectionHeader'
+import { createUuid } from '../../shared/id'
 import { buttonClass, cx, ui } from '../../shared/ui'
 import type { DraftScene, StoryDraft } from './types'
 
@@ -26,7 +27,7 @@ export function ScenesBlock({ draft, onChange, onUpdate }: ScenesBlockProps) {
           scenes: [
             ...draft.scenes,
             {
-              id: crypto.randomUUID(),
+              id: createUuid(),
               title: '',
               description: '',
               location: '',
@@ -52,7 +53,7 @@ export function ScenesBlock({ draft, onChange, onUpdate }: ScenesBlockProps) {
       <EditorSectionHeader kicker="05 · 开场" title="故事从哪里开始？" action={addButton} />
       <div className="grid gap-[17px]">
         {draft.scenes.map((scene, index) => (
-          <article className={editorItemClass} key={scene.id}>
+          <article className={editorItemClass} data-story-path={`scenes.${index}`} key={scene.id}>
             <header className={editorItemHeaderClass}>
               <span>{String(index + 1).padStart(2, '0')}</span>
               <strong>{scene.title || '未命名开场'}</strong>
@@ -93,26 +94,26 @@ export function ScenesBlock({ draft, onChange, onUpdate }: ScenesBlockProps) {
               </button>
             </header>
             <div className={editorFormGridClass}>
-              <label>
+              <label data-story-path={`scenes.${index}.title`}>
                 <span>标题</span>
                 <input value={scene.title} onChange={(event) => onUpdate(index, { title: event.target.value })} />
               </label>
-              <label>
+              <label data-story-path={`scenes.${index}.entryMethod`}>
                 <span>玩家进入方式</span>
                 <input
                   value={scene.entryMethod}
                   onChange={(event) => onUpdate(index, { entryMethod: event.target.value })}
                 />
               </label>
-              <label>
+              <label data-story-path={`scenes.${index}.location`}>
                 <span>地点</span>
                 <input value={scene.location} onChange={(event) => onUpdate(index, { location: event.target.value })} />
               </label>
-              <label>
+              <label data-story-path={`scenes.${index}.time`}>
                 <span>时间</span>
                 <input value={scene.time} onChange={(event) => onUpdate(index, { time: event.target.value })} />
               </label>
-              <label className="sm:col-span-2">
+              <label className="sm:col-span-2" data-story-path={`scenes.${index}.description`}>
                 <span>场景说明</span>
                 <textarea
                   rows={3}
@@ -120,7 +121,10 @@ export function ScenesBlock({ draft, onChange, onUpdate }: ScenesBlockProps) {
                   onChange={(event) => onUpdate(index, { description: event.target.value })}
                 />
               </label>
-              <fieldset className="m-0 border border-line p-3 sm:col-span-2">
+              <fieldset
+                className="m-0 border border-line p-3 sm:col-span-2"
+                data-story-path={`scenes.${index}.participantIds`}
+              >
                 <legend className="flex items-center gap-[5px] px-[5px] text-[10px] text-muted">
                   <Users size={14} /> 在场人物
                 </legend>
@@ -147,7 +151,7 @@ export function ScenesBlock({ draft, onChange, onUpdate }: ScenesBlockProps) {
                   ))}
                 </div>
               </fieldset>
-              <label>
+              <label data-story-path={`scenes.${index}.openingSender`}>
                 <span>开场叙述者</span>
                 <select
                   value={scene.openingSender}
@@ -162,7 +166,7 @@ export function ScenesBlock({ draft, onChange, onUpdate }: ScenesBlockProps) {
                   <option value="character">人物</option>
                 </select>
               </label>
-              <label>
+              <label data-story-path={`scenes.${index}.openingCharacterId`}>
                 <span>开场人物</span>
                 <select
                   value={scene.openingCharacterId || ''}
@@ -179,7 +183,7 @@ export function ScenesBlock({ draft, onChange, onUpdate }: ScenesBlockProps) {
                     ))}
                 </select>
               </label>
-              <label className="sm:col-span-2">
+              <label className="sm:col-span-2" data-story-path={`scenes.${index}.openingMessage`}>
                 <span>第一段故事文本</span>
                 <textarea
                   rows={8}

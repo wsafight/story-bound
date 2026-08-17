@@ -6,6 +6,7 @@ import {
   editorItemClass,
   editorItemHeaderClass,
 } from '../../components/forms/EditorSectionHeader'
+import { createUuid } from '../../shared/id'
 import { buttonClass, cx, ui } from '../../shared/ui'
 import type { DraftCharacter, StoryDraft } from './types'
 
@@ -27,7 +28,7 @@ export function CharactersBlock({ draft, onChange, onUpdate, onRemove }: Charact
           characters: [
             ...draft.characters,
             {
-              id: crypto.randomUUID(),
+              id: createUuid(),
               name: '',
               roleType: 'supporting',
               identity: '',
@@ -50,7 +51,7 @@ export function CharactersBlock({ draft, onChange, onUpdate, onRemove }: Charact
       <EditorSectionHeader kicker="02 · 人物" title="谁在故事里等待玩家？" action={addButton} />
       <div className="grid gap-[17px]">
         {draft.characters.map((character, index) => (
-          <article className={editorItemClass} key={character.id}>
+          <article className={editorItemClass} data-story-path={`characters.${index}`} key={character.id}>
             <header className={editorItemHeaderClass}>
               <span>{String(index + 1).padStart(2, '0')}</span>
               <strong>{character.name || '未命名人物'}</strong>
@@ -66,11 +67,11 @@ export function CharactersBlock({ draft, onChange, onUpdate, onRemove }: Charact
               </button>
             </header>
             <div className={editorFormGridClass}>
-              <label>
+              <label data-story-path={`characters.${index}.name`}>
                 <span>名字</span>
                 <input value={character.name} onChange={(event) => onUpdate(index, { name: event.target.value })} />
               </label>
-              <label>
+              <label data-story-path={`characters.${index}.roleType`}>
                 <span>角色类型</span>
                 <select
                   value={character.roleType}
@@ -81,7 +82,7 @@ export function CharactersBlock({ draft, onChange, onUpdate, onRemove }: Charact
                   <option value="background">背景人物</option>
                 </select>
               </label>
-              <label className="sm:col-span-2">
+              <label className="sm:col-span-2" data-story-path={`characters.${index}.identity`}>
                 <span>身份</span>
                 <textarea
                   rows={2}
@@ -89,7 +90,7 @@ export function CharactersBlock({ draft, onChange, onUpdate, onRemove }: Charact
                   onChange={(event) => onUpdate(index, { identity: event.target.value })}
                 />
               </label>
-              <label>
+              <label data-story-path={`characters.${index}.appearance`}>
                 <span>外貌</span>
                 <textarea
                   rows={3}
@@ -97,7 +98,7 @@ export function CharactersBlock({ draft, onChange, onUpdate, onRemove }: Charact
                   onChange={(event) => onUpdate(index, { appearance: event.target.value })}
                 />
               </label>
-              <label>
+              <label data-story-path={`characters.${index}.personality`}>
                 <span>性格</span>
                 <textarea
                   rows={3}
@@ -105,7 +106,7 @@ export function CharactersBlock({ draft, onChange, onUpdate, onRemove }: Charact
                   onChange={(event) => onUpdate(index, { personality: event.target.value })}
                 />
               </label>
-              <label>
+              <label data-story-path={`characters.${index}.speechStyle`}>
                 <span>说话方式</span>
                 <textarea
                   rows={3}
@@ -113,7 +114,7 @@ export function CharactersBlock({ draft, onChange, onUpdate, onRemove }: Charact
                   onChange={(event) => onUpdate(index, { speechStyle: event.target.value })}
                 />
               </label>
-              <label>
+              <label data-story-path={`characters.${index}.goals`}>
                 <span>目标与动机</span>
                 <textarea
                   rows={3}
@@ -121,7 +122,7 @@ export function CharactersBlock({ draft, onChange, onUpdate, onRemove }: Charact
                   onChange={(event) => onUpdate(index, { goals: event.target.value })}
                 />
               </label>
-              <label className="sm:col-span-2">
+              <label className="sm:col-span-2" data-story-path={`characters.${index}.knowledgeScope`}>
                 <span>知情范围</span>
                 <textarea
                   rows={3}

@@ -8,6 +8,7 @@ import { type ConversationRow, insertConversationEvent, requireCheckpoint, write
 export const appManagedCustomKeys = new Set([
   'pinnedMemories',
   'chapterSummaries',
+  'longTermMemories',
   'abilityUses',
   'stateSuggestions',
   'nodeProgress',

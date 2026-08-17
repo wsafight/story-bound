@@ -19,9 +19,9 @@ export function installBusinessServices(
   llm: StoryboundLlmService,
   scheduler: StoryboundSchedulerService,
 ) {
-  const stories = new StoryboundStoriesService(ctx, database)
-  const conversations = new StoryboundConversationsService(ctx, database, llm)
   const providers = new StoryboundProvidersService(ctx, database, llm)
+  const stories = new StoryboundStoriesService(ctx, database, llm, providers)
+  const conversations = new StoryboundConversationsService(ctx, database, llm)
   const backups = new StoryboundBackupsService(ctx, database)
   const runtimeAdmin = new StoryboundRuntimeAdminService(ctx, scheduler)
   return { stories, conversations, providers, backups, runtimeAdmin }

@@ -1,11 +1,13 @@
 import { config } from '../../config'
 import { db, newId, nowIso } from '../../db/connection'
-import { normalizeModelError } from '../../llm/adapter'
-import { getConversationRow, getMessageRow, mapMessage } from '../../repositories/conversations'
+import { ModelProviderError, normalizeModelError } from '../../llm/adapter'
+import { getConversationRow, getMessageRow, mapMessage, parseJson } from '../../repositories/conversations'
 import type { ModelProviderSnapshot } from '../../repositories/modelProviders'
 import { publishGenerationLifecycle } from '../../runtime/storyboundRuntime'
 import { AppError } from '../../shared/errors'
+import { applyLongTermMemoryForLeaf } from '../conversationManagement/longTermMemory'
 import { withActualInputTokens } from '../prompt/contextCache'
+import { degradePromptForContextLimit } from '../prompt/degradation'
 import { buildModelMessages } from '../promptBuilder'
 import { requireConversation } from './prepareHelpers'
 import { abortControllers, getModelStreamer } from './runtimeState'
@@ -102,7 +104,7 @@ export async function runGeneration(
       .query('SELECT provider_config_json, expected_checkpoint_id FROM generations WHERE id = ?')
       .get(prepared.id) as Row
     const provider = JSON.parse(String(generationConfig.provider_config_json)) as ModelProviderSnapshot
-    const prompt = await buildModelMessages(
+    let prompt = await buildModelMessages(
       prepared.conversationId,
       prepared.playerMessageId,
       String(generationConfig.expected_checkpoint_id),
@@ -111,28 +113,46 @@ export async function runGeneration(
       JSON.stringify(prompt.contextEstimate),
       prepared.id,
     )
-    for await (const chunk of modelRuntime.stream({
-      system: prompt.system,
-      messages: prompt.messages,
-      signal: controller.signal,
-      provider,
-    })) {
-      if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError')
-      if (chunk.type === 'metadata') requestId = chunk.requestId || null
-      if (chunk.type === 'finish') finishReason = chunk.reason
-      if (chunk.type === 'usage')
-        usage = {
-          inputTokens: chunk.usage.inputTokens,
-          outputTokens: chunk.usage.outputTokens,
-          cacheReadTokens: chunk.usage.cacheReadTokens ?? null,
-          reasoningTokens: chunk.usage.reasoningTokens ?? null,
+    const streamPrompt = async () => {
+      for await (const chunk of modelRuntime.stream({
+        system: prompt.system,
+        messages: prompt.messages,
+        signal: controller.signal,
+        provider,
+      })) {
+        if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError')
+        if (chunk.type === 'metadata') requestId = chunk.requestId || null
+        if (chunk.type === 'finish') finishReason = chunk.reason
+        if (chunk.type === 'usage')
+          usage = {
+            inputTokens: chunk.usage.inputTokens,
+            outputTokens: chunk.usage.outputTokens,
+            cacheReadTokens: chunk.usage.cacheReadTokens ?? null,
+            reasoningTokens: chunk.usage.reasoningTokens ?? null,
+          }
+        if ((chunk.type === 'text' || chunk.type === 'reasoning') && !firstTokenAt) firstTokenAt = nowIso()
+        if (chunk.type === 'text') {
+          content += chunk.text
+          if (content.length > config.maxMessageChars)
+            throw new AppError(422, 'MODEL_RESPONSE_TOO_LONG', '模型回复超过长度限制')
+          emit({ event: 'delta', data: { generationId: prepared.id, text: chunk.text } })
         }
-      if ((chunk.type === 'text' || chunk.type === 'reasoning') && !firstTokenAt) firstTokenAt = nowIso()
-      if (chunk.type === 'text') {
-        content += chunk.text
-        if (content.length > config.maxMessageChars)
-          throw new AppError(422, 'MODEL_RESPONSE_TOO_LONG', '模型回复超过长度限制')
-        emit({ event: 'delta', data: { generationId: prepared.id, text: chunk.text } })
+      }
+    }
+    try {
+      await streamPrompt()
+    } catch (error) {
+      if (error instanceof ModelProviderError && error.code === 'MODEL_CONTEXT_LIMIT' && !firstTokenAt && !content) {
+        const degradedPrompt = degradePromptForContextLimit(prompt)
+        if (!degradedPrompt) throw error
+        prompt = degradedPrompt
+        db.query('UPDATE generations SET context_estimate_json = ? WHERE id = ?').run(
+          JSON.stringify(prompt.contextEstimate),
+          prepared.id,
+        )
+        await streamPrompt()
+      } else {
+        throw error
       }
     }
     content = content.trim()
@@ -196,6 +216,14 @@ export async function runGeneration(
         timestamp,
       )
       db.query('UPDATE messages SET runtime_checkpoint_id = ? WHERE id = ?').run(checkpointId, messageId)
+      const memoryState = applyLongTermMemoryForLeaf({
+        conversationId: prepared.conversationId,
+        leafMessageId: messageId,
+        state: parseJson<Record<string, any>>(baseline.state_json, {}),
+        timestamp,
+      }).state
+      const stateJson = JSON.stringify(memoryState)
+      db.query('UPDATE runtime_checkpoints SET state_json = ? WHERE id = ?').run(stateJson, checkpointId)
       db.query(`
         UPDATE generations SET status = 'completed', finished_at = ?, finish_reason = ?,
           input_tokens = ?, output_tokens = ?, cache_read_tokens = ?, reasoning_tokens = ?,
@@ -221,7 +249,7 @@ export async function runGeneration(
       `).run(
         messageId,
         checkpointId,
-        String(baseline.state_json),
+        stateJson,
         String(baseline.ability_snapshot_json),
         String(modBaseline.mod_snapshot_json),
         timestamp,

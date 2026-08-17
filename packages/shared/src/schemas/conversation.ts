@@ -4,7 +4,7 @@ import { type ContractSchemaOptions, defaultContractOptions } from './options'
 
 export const createConversationSchema = z.object({
   title: z.string().trim().min(1).max(80),
-  sceneId: z.string().min(1),
+  sceneId: z.string().trim().min(1).optional(),
   providerId: z.string().min(1).optional(),
   player: z.object({
     name: z.string().trim().min(1).max(40),

@@ -19,6 +19,7 @@ import {
 import { useState } from 'react'
 import { api, downloadApi, post } from '../app/apiClient'
 import { apiQueryKey, apiQueryOptions } from '../app/apiQueries'
+import { usePromptDialog } from '../components/PromptDialog'
 import { buttonClass, cx, emptyStateClass, noticeClass, ui } from '../shared/ui'
 
 function formatDate(value: string) {
@@ -41,6 +42,7 @@ export function StoryDetailPage() {
   const conversations = conversationsQuery.data?.conversations || []
   const queryError = storyQuery.error || conversationsQuery.error
   const error = actionError || (queryError instanceof Error ? queryError.message : '')
+  const { promptText, promptDialog } = usePromptDialog()
 
   const duplicateMutation = useMutation({
     mutationFn: () => post(apiContracts.duplicateStory(storyId)),
@@ -93,7 +95,7 @@ export function StoryDetailPage() {
     }
   }
   async function renameConversation(conversation: ConversationListItem) {
-    const title = window.prompt('修改存档名称', conversation.title)?.trim()
+    const title = await promptText({ title: '修改存档名称', initialValue: conversation.title, maxLength: 80 })
     if (!title || title === conversation.title) return
     setActionError('')
     try {
@@ -348,6 +350,7 @@ export function StoryDetailPage() {
           )}
         </section>
       </div>
+      {promptDialog}
     </div>
   )
 }

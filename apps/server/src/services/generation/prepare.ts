@@ -5,10 +5,11 @@ import { AppError } from '../../shared/errors'
 import {
   assertExpectedLeaf,
   assertNoActiveGeneration,
+  findOperationReceipt,
   insertGeneration,
+  recordOperationReceipt,
   requireActiveChapter,
   requireConversation,
-  reserveOperation,
 } from './prepareHelpers'
 import type { PreparedGeneration, Row } from './types'
 
@@ -102,18 +103,7 @@ export function prepareRegenerate(
 ): PreparedGeneration {
   return db.transaction((): PreparedGeneration => {
     const conversation = requireConversation(conversationId)
-    assertExpectedLeaf(conversation, input.expectedLeafMessageId)
-    requireActiveChapter(conversation)
-    assertNoActiveGeneration(conversationId)
-    const leaf = getMessageRow(input.expectedLeafMessageId)
-    if (!leaf || !['character', 'narrator'].includes(String(leaf.sender)) || !leaf.parent_message_id) {
-      throw new AppError(409, 'REGENERATE_NOT_AVAILABLE', '只能重新生成最后一轮人物回复')
-    }
-    const generationId = newId()
-    const prior = reserveOperation(conversationId, input.operationId, 'regenerate', input, {
-      generationId,
-      playerMessageId: leaf.parent_message_id,
-    })
+    const prior = findOperationReceipt(conversationId, input.operationId, input)
     if (prior)
       return {
         id: prior.generationId,
@@ -122,6 +112,18 @@ export function prepareRegenerate(
         kind: 'regenerate',
         duplicate: true,
       }
+    assertExpectedLeaf(conversation, input.expectedLeafMessageId)
+    requireActiveChapter(conversation)
+    assertNoActiveGeneration(conversationId)
+    const leaf = getMessageRow(input.expectedLeafMessageId)
+    if (!leaf || !['character', 'narrator'].includes(String(leaf.sender)) || !leaf.parent_message_id) {
+      throw new AppError(409, 'REGENERATE_NOT_AVAILABLE', '只能重新生成最后一轮人物回复')
+    }
+    const generationId = newId()
+    recordOperationReceipt(conversationId, input.operationId, 'regenerate', input, {
+      generationId,
+      playerMessageId: leaf.parent_message_id,
+    })
     insertGeneration({
       generationId,
       conversationId,
@@ -149,6 +151,15 @@ export function prepareEditAndRetry(
       throw new AppError(404, 'PLAYER_MESSAGE_NOT_FOUND', '没有找到可编辑的玩家消息')
     const conversationId = String(original.conversation_id)
     const conversation = requireConversation(conversationId)
+    const prior = findOperationReceipt(conversationId, input.operationId, input)
+    if (prior)
+      return {
+        id: prior.generationId,
+        conversationId,
+        playerMessageId: prior.playerMessageId,
+        kind: 'edit',
+        duplicate: true,
+      }
     assertExpectedLeaf(conversation, input.expectedLeafMessageId)
     requireActiveChapter(conversation)
     assertNoActiveGeneration(conversationId)
@@ -158,18 +169,10 @@ export function prepareEditAndRetry(
     }
     const playerMessageId = newId()
     const generationId = newId()
-    const prior = reserveOperation(conversationId, input.operationId, 'edit-and-retry', input, {
+    recordOperationReceipt(conversationId, input.operationId, 'edit-and-retry', input, {
       generationId,
       playerMessageId,
     })
-    if (prior)
-      return {
-        id: prior.generationId,
-        conversationId,
-        playerMessageId: prior.playerMessageId,
-        kind: 'edit',
-        duplicate: true,
-      }
     db.query(`
       INSERT INTO messages (
         id, conversation_id, chapter_id, client_message_id, parent_message_id,

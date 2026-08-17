@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "dev": "concurrently -k -n server,web -c cyan,green \"bun run dev:server\" \"bun run dev:web\"",
-    "dev:server": "bun --watch apps/server/src/index.ts",
+    "dev:server": "bun scripts/dev-server.ts",
     "dev:web": "bun --cwd apps/web dev",
     "assets:generate": "bun apps/web/scripts/generate-covers.ts",
     "build": "bun run typecheck && bun --cwd apps/web build",

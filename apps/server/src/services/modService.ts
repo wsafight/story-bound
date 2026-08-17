@@ -55,7 +55,9 @@ function mapRuntimeMod(definition: (typeof trustedMods)[number], row: Row) {
     activationPolicy: definition.activationPolicy,
     configFields: definition.configFields,
     enabled: Boolean(row.enabled),
-    defaultConfig: parseJson<Record<string, unknown>>(row.default_config_json, definition.defaultConfig),
+    defaultConfig: definition.schema.parse(
+      parseJson<Record<string, unknown>>(row.default_config_json, definition.defaultConfig),
+    ),
     configVersion: Number(row.config_version),
     activeConversations: activeConversationCount(definition.id),
     runtime,
@@ -76,7 +78,7 @@ export async function startTrustedMods() {
       definition.id,
       definition.plugin,
       Boolean(row.enabled),
-      parseJson(row.default_config_json, definition.defaultConfig),
+      definition.schema.parse(parseJson(row.default_config_json, definition.defaultConfig)),
     )
   }
 }
@@ -88,7 +90,9 @@ export async function updateRuntimeMod(modId: string, input: UpdateRuntimeModInp
   if (!enabled && activeConversationCount(modId) > 0) {
     throw new AppError(409, 'MOD_IN_USE', '仍有存档启用了这个 MOD，请先在对应故事中停用')
   }
-  const currentConfig = parseJson<Record<string, unknown>>(row.default_config_json, definition.defaultConfig)
+  const currentConfig = definition.schema.parse(
+    parseJson<Record<string, unknown>>(row.default_config_json, definition.defaultConfig),
+  )
   const defaultConfig = definition.schema.parse(input.defaultConfig ?? currentConfig)
   if (
     modId === 'narrative-perspective' &&
@@ -127,7 +131,7 @@ export function listConversationMods(conversationId: string) {
   return listRuntimeMods().map((mod) => ({
     ...mod,
     active: Boolean(current[mod.id]),
-    config: current[mod.id]?.config || mod.defaultConfig,
+    config: current[mod.id] ? requireTrustedMod(mod.id).schema.parse(current[mod.id]?.config || {}) : mod.defaultConfig,
   }))
 }
 

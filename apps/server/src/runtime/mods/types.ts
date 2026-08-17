@@ -6,8 +6,11 @@ export type ModActivationPolicy = 'immediate' | 'next_chapter'
 export interface ModConfigField {
   key: string
   label: string
-  type: 'select' | 'boolean' | 'character-select'
+  type: 'select' | 'boolean' | 'character-select' | 'number'
   options?: Array<{ value: string; label: string }>
+  min?: number
+  max?: number
+  step?: number
   visibleWhen?: { key: string; values: string[] }
 }
 

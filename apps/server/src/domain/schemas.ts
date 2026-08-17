@@ -1,4 +1,9 @@
-import { createEditAndRetrySchema, createSendMessageSchema, createStoryDraftSchema } from '@storybound/shared/schemas'
+import {
+  createEditAndRetrySchema,
+  createGenerateStoryDraftSchema,
+  createSendMessageSchema,
+  createStoryDraftSchema,
+} from '@storybound/shared/schemas'
 import { config } from '../config'
 
 export {
@@ -12,6 +17,7 @@ export {
   createStateSuggestionSchema,
   type ForkConversationInput,
   forkConversationSchema,
+  type GenerateStoryDraftInput,
   type NarrativePreferences,
   narrativePreferencesSchema,
   type PinMemoryInput,
@@ -45,3 +51,4 @@ const options = { maxMessageChars: config.maxMessageChars }
 export const sendMessageSchema = createSendMessageSchema(options)
 export const editAndRetrySchema = createEditAndRetrySchema(options)
 export const storyDraftSchema = createStoryDraftSchema(options)
+export const generateStoryDraftSchema = createGenerateStoryDraftSchema(options)

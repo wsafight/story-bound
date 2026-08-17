@@ -25,8 +25,9 @@ test.describe('HTTP 请求边界', () => {
       data: storyDraft({ description: 'x'.repeat(1_048_576) }),
     })
     expect(response.status()).toBe(413)
-    expect(await response.json()).toEqual({
-      error: { code: 'REQUEST_BODY_TOO_LARGE', message: '提交的数据超过大小限制' },
+    expect(response.headers()['x-storybound-request-id']).toBeTruthy()
+    expect(await response.json()).toMatchObject({
+      error: { code: 'REQUEST_BODY_TOO_LARGE', message: '提交的数据超过大小限制', requestId: expect.any(String) },
     })
   })
 
@@ -37,6 +38,9 @@ test.describe('HTTP 请求边界', () => {
       data: '{"title":',
     })
     expect(response.status()).toBe(400)
-    expect(await response.json()).toEqual({ error: { code: 'INVALID_JSON', message: '请求正文不是有效的 JSON' } })
+    expect(response.headers()['x-storybound-request-id']).toBeTruthy()
+    expect(await response.json()).toMatchObject({
+      error: { code: 'INVALID_JSON', message: '请求正文不是有效的 JSON', requestId: expect.any(String) },
+    })
   })
 })

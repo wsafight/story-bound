@@ -11,6 +11,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { type Dispatch, type FormEvent, type SetStateAction, useEffect, useState } from 'react'
 import { api, post } from '../../app/apiClient'
 import { apiQueryKey, apiQueryOptions } from '../../app/apiQueries'
+import { usePromptDialog } from '../../components/PromptDialog'
 
 interface ConversationToolsOptions {
   conversationId: string
@@ -46,6 +47,7 @@ export function useConversationTools({
   const [chapterTitle, setChapterTitle] = useState('')
   const [chapterSummary, setChapterSummary] = useState('')
   const [savingChapter, setSavingChapter] = useState(false)
+  const { promptText, promptJson, promptDialog } = usePromptDialog()
   const modsContract = apiContracts.conversationMods(conversationId)
   const stateSuggestionsContract = apiContracts.stateSuggestions(conversationId)
   const stateHintsContract = apiContracts.stateHints(conversationId)
@@ -167,19 +169,6 @@ export function useConversationTools({
     void queryClient.invalidateQueries({ queryKey: apiQueryKey(replyCandidateComparisonContract), exact: true })
   }
 
-  function parsePromptJson(label: string, initial: Record<string, unknown>) {
-    const raw = window.prompt(label, JSON.stringify(initial, null, 2))
-    if (raw === null) return null
-    try {
-      const parsed = JSON.parse(raw)
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('需要 JSON 对象')
-      return parsed as Record<string, unknown>
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'JSON 格式不正确')
-      return null
-    }
-  }
-
   async function toggleMemory(message: StoryMessage) {
     if (!conversation || generationId) return
     setError('')
@@ -258,6 +247,7 @@ export function useConversationTools({
     const appManaged = new Set([
       'pinnedMemories',
       'chapterSummaries',
+      'longTermMemories',
       'abilityUses',
       'stateSuggestions',
       'nodeProgress',
@@ -265,7 +255,7 @@ export function useConversationTools({
     const current = Object.fromEntries(
       Object.entries(conversation.state.custom || {}).filter(([key]) => !appManaged.has(key)),
     )
-    const patch = parsePromptJson('提交自定义状态补丁', current)
+    const patch = await promptJson({ title: '提交自定义状态补丁', label: 'JSON 对象', initialValue: current })
     const expected = activeExpectation()
     if (!patch || !expected) return
     setError('')
@@ -285,7 +275,7 @@ export function useConversationTools({
     if (!conversation || generationId) return
     const ability = conversation.abilities.find((item) => item.id === abilityId)
     if (!ability) return
-    const input = parsePromptJson(`使用「${ability.name}」的输入`, {})
+    const input = await promptJson({ title: `使用「${ability.name}」`, label: '输入 JSON 对象', initialValue: {} })
     const expected = activeExpectation()
     if (!input || !expected) return
     setError('')
@@ -302,9 +292,9 @@ export function useConversationTools({
 
   async function createStateSuggestion() {
     if (!conversation || generationId) return
-    const title = window.prompt('建议标题', '状态变化建议')?.trim()
+    const title = await promptText({ title: '建议标题', initialValue: '状态变化建议', maxLength: 120 })
     if (!title) return
-    const patch = parsePromptJson('建议状态 Patch', {})
+    const patch = await promptJson({ title: '建议状态 Patch', label: 'Patch JSON 对象', initialValue: {} })
     const expected = activeExpectation()
     if (!patch || !expected) return
     setError('')
@@ -339,7 +329,7 @@ export function useConversationTools({
 
   async function forkFromMessage(message: StoryMessage) {
     if (!conversation) return
-    const title = window.prompt('派生存档名称', `${conversation.title} 分支`)?.trim()
+    const title = await promptText({ title: '派生存档名称', initialValue: `${conversation.title} 分支`, maxLength: 80 })
     if (!title) return
     setError('')
     try {
@@ -380,7 +370,7 @@ export function useConversationTools({
     }
   }
 
-  function updateModDraft(mod: ConversationMod, field: ModConfigField, value: string | boolean) {
+  function updateModDraft(mod: ConversationMod, field: ModConfigField, value: string | boolean | number) {
     setModDrafts((current) => {
       const config = { ...(current[mod.id] || mod.config), [field.key]: value }
       if (field.key === 'perspective') {
@@ -463,5 +453,6 @@ export function useConversationTools({
     openContextInspector,
     openDiagnosticsPanel,
     updateNodeProgress,
+    promptDialog,
   }
 }

@@ -105,6 +105,7 @@ export function ConversationPage() {
     openContextInspector,
     openDiagnosticsPanel,
     updateNodeProgress,
+    promptDialog,
   } = tools
 
   if (!conversation)
@@ -232,6 +233,7 @@ export function ConversationPage() {
         onSubmit={finishChapter}
         onClose={() => setShowChapter(false)}
       />
+      {promptDialog}
     </div>
   )
 }

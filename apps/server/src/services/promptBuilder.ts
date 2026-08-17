@@ -1,4 +1,4 @@
-import { db } from '../db/connection'
+import { db, measureDbQueries, nowIso } from '../db/connection'
 import { getConversationRow } from '../repositories/conversations'
 import { assemblePrompt, collectPromptContributions } from '../runtime/storyboundRuntime'
 import { AppError } from '../shared/errors'
@@ -13,10 +13,15 @@ export type { ContextEstimate } from './prompt/types'
 export async function buildModelMessages(conversationId: string, playerMessageId: string, checkpointId?: string) {
   const activeMods = getModSnapshot(conversationId, checkpointId)
   const request = { conversationId, playerMessageId, activeMods }
-  const contributions = await collectPromptContributions(request)
-  const result = await assemblePrompt(request, () =>
-    buildBaseModelMessages(conversationId, playerMessageId, contributions),
-  )
+  const measured = await measureDbQueries(async () => {
+    const contributions = await collectPromptContributions(request)
+    return await assemblePrompt(request, () => buildBaseModelMessages(conversationId, playerMessageId, contributions))
+  })
+  const result = measured.result
+  result.contextEstimate.assemblyMetrics = {
+    ...measured.metrics,
+    measuredAt: nowIso(),
+  }
   const actualTokens =
     estimateTokens(result.system) +
     result.messages.reduce((total, message) => total + estimateTokens(message.content) + 4, 0)

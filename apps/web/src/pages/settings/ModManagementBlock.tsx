@@ -56,7 +56,29 @@ export function ModManagementBlock({ mods, updatingMod, onUpdate }: ModManagemen
               {mod.configFields
                 .filter((field) => field.type !== 'character-select' && isFieldVisible(field, mod.defaultConfig))
                 .map((field) =>
-                  field.type === 'select' ? (
+                  field.type === 'number' ? (
+                    <label className="grid gap-[5px]" key={field.key}>
+                      <span className="text-[9px] text-muted">{field.label}</span>
+                      <input
+                        className="h-8 w-full rounded-[3px] border border-line bg-[#f8f9f7] px-2 text-[10px]"
+                        type="number"
+                        min={field.min}
+                        max={field.max}
+                        step={field.step || 1}
+                        value={Number(mod.defaultConfig[field.key] ?? field.min ?? 0)}
+                        disabled={!mod.enabled || updatingMod === mod.id}
+                        onChange={(event) => {
+                          const value = event.target.valueAsNumber
+                          onUpdate(mod, {
+                            defaultConfig: {
+                              ...mod.defaultConfig,
+                              [field.key]: Number.isFinite(value) ? value : field.min || 0,
+                            },
+                          })
+                        }}
+                      />
+                    </label>
+                  ) : field.type === 'select' ? (
                     <label className="grid gap-[5px]" key={field.key}>
                       <span className="text-[9px] text-muted">{field.label}</span>
                       <select

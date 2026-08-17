@@ -1,4 +1,5 @@
 import { Database } from 'bun:sqlite'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { config } from '../config'
@@ -11,6 +12,14 @@ if (!process.env.DATA_DIR) makeDirectoryPrivate(config.dataDir)
 
 export const db = new Database(config.dbPath, { create: true })
 makeFilePrivate(config.dbPath)
+
+const queryMetricsStorage = new AsyncLocalStorage<{ queryCount: number }>()
+const originalQuery = db.query.bind(db) as typeof db.query
+;(db as unknown as { query: typeof db.query }).query = ((...args: Parameters<typeof db.query>) => {
+  const metrics = queryMetricsStorage.getStore()
+  if (metrics) metrics.queryCount += 1
+  return originalQuery(...args)
+}) as typeof db.query
 
 db.exec('PRAGMA foreign_keys = ON')
 db.exec('PRAGMA journal_mode = WAL')
@@ -25,4 +34,17 @@ export function nowIso() {
 
 export function newId() {
   return crypto.randomUUID()
+}
+
+export async function measureDbQueries<T>(fn: () => T | Promise<T>) {
+  const metrics = { queryCount: 0 }
+  const startedAt = Date.now()
+  const result = await queryMetricsStorage.run(metrics, fn)
+  return {
+    result,
+    metrics: {
+      dbQueryCount: metrics.queryCount,
+      durationMs: Math.max(0, Date.now() - startedAt),
+    },
+  }
 }

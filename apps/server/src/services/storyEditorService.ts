@@ -1,5 +1,6 @@
 export * from './storyEditor/drafts'
 export * from './storyEditor/export'
+export * from './storyEditor/generate'
 export * from './storyEditor/import'
 export * from './storyEditor/lifecycle'
 export * from './storyEditor/lint'

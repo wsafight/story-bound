@@ -7,16 +7,57 @@ import { getDefaultProviderSnapshot, getModelProvider, snapshotFromProvider } fr
 import { getStory } from '../repositories/stories'
 import { getTrustedMod, validateModConfigForStory } from '../runtime/modCatalog'
 import { AppError } from '../shared/errors'
+import { ensureMemoryCustom } from './conversationManagement/longTermMemory'
 import { assertCustomStateMatchesSchema } from './dynamicStateSchema'
 import { ensureRuntimeModRows } from './modService'
 
 const runtimeStateSchema = createRuntimeStateSchema({ maxMessageChars: config.maxMessageChars })
 
+type Story = NonNullable<ReturnType<typeof getStory>>
+type StoryScene = Story['scenes'][number]
+
+function openingFallbackText(story: Story) {
+  const text = [story.description, story.background].filter(Boolean).join('\n\n').trim()
+  const opening = text || `${story.title}的故事开始了。`
+  return opening.length > config.maxMessageChars ? opening.slice(0, config.maxMessageChars) : opening
+}
+
+function createDefaultOpeningScene(story: Story): StoryScene {
+  const location = story.summary || story.title
+  const time = '故事开始'
+  return {
+    id: `default-opening:${story.id}`,
+    title: '默认开场',
+    description: story.summary || '从故事前情进入。',
+    location,
+    time,
+    participantIds: [],
+    entryMethod: '从故事前情开始',
+    openingMessage: openingFallbackText(story),
+    openingSender: 'narrator',
+    openingCharacterId: null,
+    initialState: {
+      phase: '故事开始',
+      scene: { location, time, participantIds: [] },
+      custom: ensureMemoryCustom(story.defaultState),
+    },
+    isDefault: true,
+  }
+}
+
+function resolveOpeningScene(story: Story, sceneId?: string): StoryScene {
+  if (sceneId) {
+    const scene = story.scenes.find((item) => item.id === sceneId)
+    if (scene) return scene
+    throw new AppError(422, 'SCENE_INVALID', '开场不属于当前故事卡')
+  }
+  return story.scenes.find((item) => item.isDefault) || story.scenes[0] || createDefaultOpeningScene(story)
+}
+
 export function createConversation(storyId: string, input: CreateConversationInput, database: Database = db) {
   const story = getStory(storyId, false, database)
   if (!story) throw new AppError(404, 'STORY_NOT_FOUND', '没有找到这张故事卡')
-  const scene = story.scenes.find((item) => item.id === input.sceneId)
-  if (!scene) throw new AppError(422, 'SCENE_INVALID', '开场不属于当前故事卡')
+  const scene = resolveOpeningScene(story, input.sceneId)
   if (!story.playerTemplate) throw new AppError(422, 'PLAYER_TEMPLATE_MISSING', '故事卡缺少玩家模板')
 
   const abilityIdSet = new Set(input.abilityIds)
@@ -54,7 +95,10 @@ export function createConversation(storyId: string, input: CreateConversationInp
   }
   const initialStateResult = runtimeStateSchema.safeParse(scene.initialState)
   if (!initialStateResult.success) throw new AppError(422, 'STATE_INVALID', '开场状态格式不正确')
-  const initialState = initialStateResult.data
+  const initialState = {
+    ...initialStateResult.data,
+    custom: ensureMemoryCustom(initialStateResult.data.custom),
+  }
   assertCustomStateMatchesSchema(story.stateSchema, initialState.custom || {}, '开场自定义状态')
   const selectedProvider = input.providerId ? getModelProvider(input.providerId, database) : null
   if (input.providerId && !selectedProvider) throw new AppError(422, 'PROVIDER_INVALID', '选择的模型 Provider 不存在')

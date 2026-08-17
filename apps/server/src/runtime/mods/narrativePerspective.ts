@@ -34,6 +34,7 @@ const plugin = createPromptMod(meta, narrativePreferencesSchema, (raw, request) 
     balanced: '每次回复采用适中篇幅，通常使用三到五段，兼顾现场、人物反应和剧情推进。',
     expanded: '每次回复可以充分展开，通常使用五到八段，但不得重复信息或替玩家推进多个关键决定。',
   }[config.length]
+  const targetLength = `本轮叙事正文目标约 ${config.targetWords} 字，允许上下浮动 15%；优先保证回应完整、节奏自然，不为了凑字数重复信息。`
   const dialogue = {
     low: '对白从简，以动作、环境和非语言反应承载主要信息。',
     balanced: '在对白、动作和环境描写之间保持自然平衡。',
@@ -49,6 +50,7 @@ const plugin = createPromptMod(meta, narrativePreferencesSchema, (raw, request) 
       perspective,
       tense,
       length,
+      targetLength,
       dialogue,
       '这些规则只作用于后续叙事正文，不改写历史消息；引号内的角色对白保留说话者自然的人称。单次回复内不要无故切换人称或视角主体。',
     ].join('\n'),
@@ -58,7 +60,7 @@ const plugin = createPromptMod(meta, narrativePreferencesSchema, (raw, request) 
 export const narrativePerspectiveMod: TrustedModDefinition = {
   ...meta,
   description: '控制叙述人称、视角主体、时态、篇幅和对白密度。',
-  version: '1.0.0',
+  version: '1.1.0',
   activationPolicy: 'immediate',
   schema: narrativePreferencesSchema,
   defaultConfig: narrativePreferencesSchema.parse({}),
@@ -100,6 +102,14 @@ export const narrativePerspectiveMod: TrustedModDefinition = {
         { value: 'balanced', label: '适中' },
         { value: 'expanded', label: '展开' },
       ],
+    },
+    {
+      key: 'targetWords',
+      label: '目标字数',
+      type: 'number',
+      min: 100,
+      max: 3000,
+      step: 50,
     },
     {
       key: 'dialogueDensity',

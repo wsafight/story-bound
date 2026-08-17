@@ -14,6 +14,7 @@ describe('共享 Zod 契约', () => {
       viewpointCharacterId: null,
       tense: 'present',
       length: 'balanced',
+      targetWords: 800,
       dialogueDensity: 'balanced',
     })
     expect(
@@ -27,6 +28,12 @@ describe('共享 Zod 契约', () => {
         player: { name: '测试玩家' },
       }).narrative,
     ).toEqual(narrativePreferencesSchema.parse({}))
+    expect(
+      createConversationSchema.parse({
+        title: '无显式开场',
+        player: { name: '测试玩家' },
+      }).sceneId,
+    ).toBeUndefined()
   })
 
   it('允许服务端注入消息长度上限', () => {
@@ -56,7 +63,22 @@ describe('共享 Zod 契约', () => {
       schema.parse({
         phase: ' 调查 ',
         scene: { location: ' 候车室 ', participantIds: ['char-1'] },
-        custom: { pinnedMemories: [{ messageId: 'message-1', content: '线索', createdAt: '2026-01-01T00:00:00Z' }] },
+        custom: {
+          pinnedMemories: [{ messageId: 'message-1', content: '线索', createdAt: '2026-01-01T00:00:00Z' }],
+          longTermMemories: [
+            {
+              id: 'memory-1',
+              fromMessageId: 'message-1',
+              toMessageId: 'message-2',
+              fromDepth: 1,
+              toDepth: 2,
+              messageCount: 2,
+              summary: '长期线索',
+              facts: ['沈砚认出林舟'],
+              createdAt: '2026-01-01T00:00:00Z',
+            },
+          ],
+        },
       }),
     ).toMatchObject({
       phase: '调查',

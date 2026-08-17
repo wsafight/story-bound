@@ -27,7 +27,7 @@ export function BasicBlock({ draft, onChange }: BasicBlockProps) {
           <img className="size-full object-cover" src={draft.cover || '/covers/rain-terminal.png'} alt="故事封面预览" />
         </div>
         <div className={editorFieldsClass}>
-          <label>
+          <label data-story-path="title">
             <span>故事标题</span>
             <input
               value={draft.title}
@@ -36,7 +36,7 @@ export function BasicBlock({ draft, onChange }: BasicBlockProps) {
               required
             />
           </label>
-          <label>
+          <label data-story-path="cover">
             <span>封面地址</span>
             <div className="grid grid-cols-[34px_minmax(0,1fr)] items-center rounded border border-line bg-surface text-muted focus-within:border-green focus-within:shadow-[0_0_0_3px_rgba(50,94,75,0.09)] [&>svg]:justify-self-center">
               <UploadCloud size={15} />
@@ -48,7 +48,7 @@ export function BasicBlock({ draft, onChange }: BasicBlockProps) {
               />
             </div>
           </label>
-          <label className="sm:col-span-2">
+          <label className="sm:col-span-2" data-story-path="summary">
             <span>一句话简介</span>
             <textarea
               rows={3}
@@ -56,7 +56,7 @@ export function BasicBlock({ draft, onChange }: BasicBlockProps) {
               onChange={(event) => onChange({ ...draft, summary: event.target.value })}
             />
           </label>
-          <label className="sm:col-span-2">
+          <label className="sm:col-span-2" data-story-path="description">
             <span>详情页引言</span>
             <textarea
               rows={4}
@@ -64,7 +64,7 @@ export function BasicBlock({ draft, onChange }: BasicBlockProps) {
               onChange={(event) => onChange({ ...draft, description: event.target.value })}
             />
           </label>
-          <label>
+          <label data-story-path="tags">
             <span>标签（逗号分隔）</span>
             <input
               value={draft.tags.join(', ')}
@@ -82,7 +82,7 @@ export function BasicBlock({ draft, onChange }: BasicBlockProps) {
         </div>
       </div>
       <div className={editorLongFieldsClass}>
-        <label>
+        <label data-story-path="background">
           <span>故事背景</span>
           <textarea
             rows={9}
@@ -90,7 +90,7 @@ export function BasicBlock({ draft, onChange }: BasicBlockProps) {
             onChange={(event) => onChange({ ...draft, background: event.target.value })}
           />
         </label>
-        <label>
+        <label data-story-path="worldRules">
           <span>世界规则与叙事约束</span>
           <textarea
             rows={9}
@@ -98,7 +98,7 @@ export function BasicBlock({ draft, onChange }: BasicBlockProps) {
             onChange={(event) => onChange({ ...draft, worldRules: event.target.value })}
           />
         </label>
-        <label>
+        <label data-story-path="contentWarnings">
           <span>内容提示（每行一项）</span>
           <textarea
             rows={5}
@@ -106,7 +106,7 @@ export function BasicBlock({ draft, onChange }: BasicBlockProps) {
             onChange={(event) => onChange({ ...draft, contentWarnings: lines(event.target.value) })}
           />
         </label>
-        <label>
+        <label data-story-path="contentBoundaries">
           <span>内容边界（每行一项）</span>
           <textarea
             rows={5}

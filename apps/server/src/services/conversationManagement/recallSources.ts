@@ -2,8 +2,8 @@ import { getLorebookDiagnostics } from './lorebookDiagnostics'
 
 type JsonRecord = Record<string, any>
 
-export type RecallSourceId = 'lorebook' | 'pinned_memory' | 'chapter_summary'
-export type RecallBoundary = 'background_lore' | 'confirmed_memory' | 'chapter_summary'
+export type RecallSourceId = 'lorebook' | 'pinned_memory' | 'chapter_summary' | 'long_term_memory'
+export type RecallBoundary = 'background_lore' | 'confirmed_memory' | 'chapter_summary' | 'long_term_memory'
 export type RecallReason =
   | 'matched'
   | 'query_empty'
@@ -92,9 +92,11 @@ function memoryItems(state: JsonRecord) {
   const custom = state.custom && typeof state.custom === 'object' && !Array.isArray(state.custom) ? state.custom : {}
   const pinnedMemories = Array.isArray(custom.pinnedMemories) ? custom.pinnedMemories : []
   const chapterSummaries = Array.isArray(custom.chapterSummaries) ? custom.chapterSummaries : []
+  const longTermMemories = Array.isArray(custom.longTermMemories) ? custom.longTermMemories : []
   return {
     pinnedMemories,
     chapterSummaries,
+    longTermMemories,
   }
 }
 
@@ -143,6 +145,34 @@ export const recallSources: RecallSource[] = [
           title: `固定记忆 ${index + 1}`,
           source: 'pinned_memory',
           boundary: 'confirmed_memory',
+          matched,
+          relevanceScore: score.relevanceScore,
+          matchedTerms: score.matchedTerms,
+          contentPreview: previewRecallContent(content),
+          reasons: matched
+            ? (['matched'] as RecallReason[])
+            : [context.terms.length === 0 ? 'query_empty' : 'low_relevance'],
+        }
+      })
+    },
+  },
+  {
+    id: 'long_term_memory',
+    label: '长期记忆',
+    boundary: 'long_term_memory',
+    engine: 'lexical',
+    fts5Ready: true,
+    collect(context) {
+      return memoryItems(context.state).longTermMemories.map((item: JsonRecord, index: number) => {
+        const facts = Array.isArray(item.facts) ? item.facts : []
+        const content = [item.summary, ...facts].filter(Boolean).join('\n')
+        const score = scoreRecallText({ queryTerms: context.terms, text: content })
+        const matched = context.terms.length === 0 ? false : score.relevanceScore >= 0.15
+        return {
+          id: String(item.id || `long-term-memory-${index + 1}`),
+          title: `长期记忆 ${index + 1}`,
+          source: 'long_term_memory',
+          boundary: 'long_term_memory',
           matched,
           relevanceScore: score.relevanceScore,
           matchedTerms: score.matchedTerms,

@@ -3,6 +3,12 @@ import { resolveModelLimits } from '../../llm/modelLimits'
 import { getConversationRow, parseJson } from '../../repositories/conversations'
 import type { PromptAssembly, PromptContribution } from '../../runtime/storyboundRuntime'
 import { AppError } from '../../shared/errors'
+import {
+  clipHistoryContent,
+  formatLongTermMemoryForPrompt,
+  longTermMemoriesForPrompt,
+  shortTermHistoryMessageLimit,
+} from '../conversationManagement/longTermMemory'
 import { storyConditionMatches } from '../storyConditions'
 import { applyPromptContributions, assertSegmentBudget, includeRecords, quota } from './budget'
 import { assembleSystemPrompt, createPromptBlock, createPromptSnapshot, promptBlockToSegment } from './compiler'
@@ -153,15 +159,22 @@ export function buildBaseModelMessages(
   const declarativeModText = declarativeModResult.text ? `声明式 MOD 提示词贡献：\n${declarativeModResult.text}` : ''
   const abilityText = abilityResult.text ? `玩家启用能力：\n${abilityResult.text}` : '玩家未启用额外能力。'
   const custom = state.custom && typeof state.custom === 'object' ? state.custom : {}
+  const longTermMemories = longTermMemoriesForPrompt(state)
   const pinnedMemories = Array.isArray(custom.pinnedMemories) ? custom.pinnedMemories : []
   const chapterSummaries = Array.isArray(custom.chapterSummaries) ? custom.chapterSummaries : []
   const memoryResult = includeRecords(
-    [...pinnedMemories].reverse().concat([...chapterSummaries].reverse()),
-    (item: any) =>
-      typeof item === 'string' ? item : `${item.title ? `${item.title}：` : ''}${item.summary || item.content || ''}`,
+    [...longTermMemories]
+      .reverse()
+      .map((item) => ({ ...item, memoryType: 'long_term' }))
+      .concat([...pinnedMemories].reverse(), [...chapterSummaries].reverse()),
+    (item: any) => {
+      if (typeof item === 'string') return item
+      if (item.memoryType === 'long_term') return formatLongTermMemoryForPrompt(item)
+      return `${item.title ? `${item.title}：` : ''}${item.summary || item.content || ''}`
+    },
     budgets.memory,
   )
-  const memoryText = memoryResult.text ? `已确认的章节回顾与固定记忆：\n${memoryResult.text}` : ''
+  const memoryText = memoryResult.text ? `已确认的长期记忆、章节回顾与固定记忆：\n${memoryResult.text}` : ''
 
   const checkpointId = String(current.runtime_checkpoint_id)
   const storyVersion = `story:${story.id || conversation.story_card_id || 'snapshot'}@${story.version || 0}`
@@ -286,7 +299,7 @@ export function buildBaseModelMessages(
     }),
     createPromptBlock({
       id: 'state.memory',
-      title: '章节回顾与固定记忆',
+      title: '长期记忆、章节回顾与固定记忆',
       source: 'memory',
       scope: 'conversation',
       priority: 'medium',
@@ -349,7 +362,8 @@ export function buildBaseModelMessages(
   ) {
     throw new AppError(409, 'MESSAGE_PATH_INCOMPLETE', '无法恢复当前消息路径')
   }
-  let remainingAncestors = totalHistoryMessages
+  const maxRawHistoryMessages = Math.min(totalHistoryMessages, shortTermHistoryMessageLimit)
+  let remainingAncestors = maxRawHistoryMessages
   let ancestorId = current.parent_message_id ? String(current.parent_message_id) : ''
   let budgetFilled = false
   const batchSize = 256
@@ -358,7 +372,7 @@ export function buildBaseModelMessages(
     const rows = ancestorBatch(conversationId, ancestorId, requestedBatchSize)
     if (rows.length === 0) throw new AppError(409, 'MESSAGE_PATH_INCOMPLETE', '无法恢复当前消息路径')
     for (const row of rows) {
-      const rawContent = String(row.content)
+      const rawContent = clipHistoryContent(String(row.content), historyNewestFirst.length)
       const content =
         row.sender === 'player'
           ? `[玩家${modeLabels[String(row.input_mode) as keyof typeof modeLabels] || '输入'}]\n${rawContent}`
@@ -381,6 +395,8 @@ export function buildBaseModelMessages(
   }
   const history = historyNewestFirst.reverse()
   const historyMessageIds = historyMessageIdsNewestFirst.reverse()
+  const omittedByShortTermWindow = Math.max(0, totalHistoryMessages - shortTermHistoryMessageLimit)
+  const omittedByBudget = Math.max(0, maxRawHistoryMessages - history.length)
   const omittedMessages = Math.max(0, totalHistoryMessages - history.length)
   const historyBlock = createPromptBlock({
     id: 'history.path',
@@ -394,7 +410,7 @@ export function buildBaseModelMessages(
     included: true,
     includedItems: history.length,
     omittedItems: omittedMessages,
-    reason: omittedMessages > 0 ? 'budget_exceeded' : undefined,
+    reason: omittedByBudget > 0 ? 'budget_exceeded' : omittedByShortTermWindow > 0 ? 'short_term_window' : undefined,
     dependencies: historyMessageIds,
   })
   const inputBlock = createPromptBlock({

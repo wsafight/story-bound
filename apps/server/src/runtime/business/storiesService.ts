@@ -1,17 +1,20 @@
 import type { Database } from 'bun:sqlite'
 import { type Context, Service } from '@deepseek-ai/cordis'
-import type { StoryDraftInput } from '../../domain/schemas'
+import type { GenerateStoryDraftInput, StoryDraftInput } from '../../domain/schemas'
 import { StoriesRepository } from '../../repositories/stories'
 import {
   createStoryDraft,
   deleteStoryDraft,
   duplicateStory,
   exportStoryPackage,
+  generateStoryDraftFromPrompt,
   importStoryPackage,
   lintStoryDraft,
   publishStory,
   updateStoryDraft,
 } from '../../services/storyEditorService'
+import type { StoryboundLlmService } from '../infrastructureRuntime'
+import type { StoryboundProvidersService } from './providersService'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -25,6 +28,8 @@ export class StoryboundStoriesService extends Service {
   constructor(
     ctx: Context,
     private readonly database: Database,
+    private readonly llm: StoryboundLlmService,
+    private readonly providers: StoryboundProvidersService,
   ) {
     super(ctx, 'stories')
     this.repository = new StoriesRepository(database)
@@ -48,6 +53,15 @@ export class StoryboundStoriesService extends Service {
 
   create(input: StoryDraftInput) {
     return createStoryDraft(input, this.database)
+  }
+
+  generate(input: GenerateStoryDraftInput, signal?: AbortSignal) {
+    return generateStoryDraftFromPrompt(input, {
+      provider: this.providers.defaultSnapshot(),
+      stream: (streamInput) => this.llm.stream(streamInput),
+      signal,
+      database: this.database,
+    })
   }
 
   update(storyId: string, input: StoryDraftInput) {

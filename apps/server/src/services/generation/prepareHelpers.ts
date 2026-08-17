@@ -92,13 +92,7 @@ function requestHash(value: unknown) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
 
-export function reserveOperation(
-  conversationId: string,
-  operationId: string,
-  type: string,
-  payload: unknown,
-  result: object,
-) {
+export function findOperationReceipt(conversationId: string, operationId: string, payload: unknown) {
   const hash = requestHash(payload)
   const existing = db
     .query('SELECT request_hash, result_json FROM operation_receipts WHERE conversation_id = ? AND operation_id = ?')
@@ -107,9 +101,32 @@ export function reserveOperation(
     if (existing.request_hash !== hash) throw new AppError(409, 'IDEMPOTENCY_KEY_REUSED', '操作编号已经用于其他请求')
     return JSON.parse(String(existing.result_json)) as { generationId: string; playerMessageId: string }
   }
+  return null
+}
+
+export function recordOperationReceipt(
+  conversationId: string,
+  operationId: string,
+  type: string,
+  payload: unknown,
+  result: object,
+) {
+  const hash = requestHash(payload)
   db.query(`
     INSERT INTO operation_receipts (conversation_id, operation_id, type, request_hash, result_json, created_at)
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(conversationId, operationId, type, hash, JSON.stringify(result), nowIso())
+}
+
+export function reserveOperation(
+  conversationId: string,
+  operationId: string,
+  type: string,
+  payload: unknown,
+  result: object,
+) {
+  const existing = findOperationReceipt(conversationId, operationId, payload)
+  if (existing) return existing
+  recordOperationReceipt(conversationId, operationId, type, payload, result)
   return null
 }

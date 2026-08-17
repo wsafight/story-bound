@@ -25,6 +25,7 @@ const allowedKeywords = new Set([
 const appManagedCustomKeys = new Set([
   'pinnedMemories',
   'chapterSummaries',
+  'longTermMemories',
   'abilityUses',
   'stateSuggestions',
   'nodeProgress',

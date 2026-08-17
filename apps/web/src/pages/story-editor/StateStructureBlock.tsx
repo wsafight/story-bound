@@ -5,6 +5,7 @@ import {
   editorItemClass,
   editorItemHeaderClass,
 } from '../../components/forms/EditorSectionHeader'
+import { createUuid } from '../../shared/id'
 import { buttonClass, cx, emptyStateClass, ui } from '../../shared/ui'
 import { JsonField } from './JsonField'
 import type { DraftDeclarativeMod, DraftLorebookEntry, DraftStoryFact, DraftStoryNode, StoryDraft } from './types'
@@ -179,8 +180,8 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
   }
 
   return (
-    <section className="grid gap-10">
-      <div>
+    <section className="grid gap-10" data-story-path="state">
+      <div data-story-path="stateSchema">
         <EditorSectionHeader
           kicker="05 · 状态"
           title="故事运行时有哪些确定状态？"
@@ -196,7 +197,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
             const field = properties[key] || {}
             const policy = policyFor(draft, key)
             return (
-              <article className={editorItemClass} key={key}>
+              <article className={editorItemClass} data-story-path={`stateSchema.properties.${key}`} key={key}>
                 <header className={editorItemHeaderClass}>
                   <span>ST</span>
                   <strong>{field.title || key}</strong>
@@ -335,7 +336,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
         </div>
       </div>
 
-      <div>
+      <div data-story-path="facts">
         <EditorSectionHeader
           kicker="06 · 事实"
           title="哪些信息是事实或秘密？"
@@ -349,7 +350,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                   facts: [
                     ...draft.facts,
                     {
-                      id: crypto.randomUUID(),
+                      id: createUuid(),
                       title: '',
                       content: '',
                       visibility: 'public',
@@ -367,7 +368,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
         {draft.facts.length === 0 && <div className={emptyStateClass(true)}>还没有结构化事实。</div>}
         <div className="grid gap-[13px]">
           {draft.facts.map((fact, index) => (
-            <article className={editorItemClass} key={fact.id}>
+            <article className={editorItemClass} data-story-path={`facts.${index}`} key={fact.id}>
               <header className={editorItemHeaderClass}>
                 <span>{String(index + 1).padStart(2, '0')}</span>
                 <strong>{fact.title || '未命名事实'}</strong>
@@ -384,11 +385,11 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                 </button>
               </header>
               <div className={editorFormGridClass}>
-                <label>
+                <label data-story-path={`facts.${index}.title`}>
                   <span>标题</span>
                   <input value={fact.title} onChange={(event) => updateFact(index, { title: event.target.value })} />
                 </label>
-                <label>
+                <label data-story-path={`facts.${index}.visibility`}>
                   <span>可见性</span>
                   <select
                     value={fact.visibility}
@@ -400,7 +401,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                     <option value="secret">秘密</option>
                   </select>
                 </label>
-                <label className="sm:col-span-2">
+                <label className="sm:col-span-2" data-story-path={`facts.${index}.content`}>
                   <span>内容</span>
                   <textarea
                     rows={3}
@@ -408,7 +409,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                     onChange={(event) => updateFact(index, { content: event.target.value })}
                   />
                 </label>
-                <label>
+                <label data-story-path={`facts.${index}.tags`}>
                   <span>标签（逗号分隔）</span>
                   <input
                     value={fact.tags.join(', ')}
@@ -422,7 +423,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                     }
                   />
                 </label>
-                <div className="grid gap-2">
+                <div className="grid gap-2" data-story-path={`facts.${index}.knownByCharacterIds`}>
                   <span className="text-[11px] font-bold text-[#505652]">知情人物</span>
                   <div className="flex flex-wrap gap-1.5">
                     {draft.characters.map((character) => (
@@ -452,7 +453,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
         </div>
       </div>
 
-      <div>
+      <div data-story-path="lorebookEntries">
         <EditorSectionHeader
           kicker="07 · 世界书"
           title="哪些背景资料需要按关键词召回？"
@@ -466,7 +467,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                   lorebookEntries: [
                     ...draft.lorebookEntries,
                     {
-                      id: crypto.randomUUID(),
+                      id: createUuid(),
                       title: '',
                       content: '',
                       keywords: [],
@@ -489,7 +490,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
         {draft.lorebookEntries.length === 0 && <div className={emptyStateClass(true)}>还没有世界书资料。</div>}
         <div className="grid gap-[13px]">
           {draft.lorebookEntries.map((entry, index) => (
-            <article className={editorItemClass} key={entry.id}>
+            <article className={editorItemClass} data-story-path={`lorebookEntries.${index}`} key={entry.id}>
               <header className={editorItemHeaderClass}>
                 <span>{String(index + 1).padStart(2, '0')}</span>
                 <strong>{entry.title || '未命名资料'}</strong>
@@ -509,14 +510,14 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                 </button>
               </header>
               <div className={editorFormGridClass}>
-                <label>
+                <label data-story-path={`lorebookEntries.${index}.title`}>
                   <span>标题</span>
                   <input
                     value={entry.title}
                     onChange={(event) => updateLorebookEntry(index, { title: event.target.value })}
                   />
                 </label>
-                <label>
+                <label data-story-path={`lorebookEntries.${index}.priority`}>
                   <span>优先级</span>
                   <select
                     value={entry.priority}
@@ -529,7 +530,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                     <option value="low">低</option>
                   </select>
                 </label>
-                <label>
+                <label data-story-path={`lorebookEntries.${index}.keywords`}>
                   <span>关键词（逗号分隔）</span>
                   <input
                     value={entry.keywords.join(', ')}
@@ -543,7 +544,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                     }
                   />
                 </label>
-                <label>
+                <label data-story-path={`lorebookEntries.${index}.scope`}>
                   <span>作用域</span>
                   <select
                     value={entry.scope}
@@ -567,7 +568,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                   <span>启用</span>
                 </label>
                 {entry.scope === 'scene' && (
-                  <div className="grid gap-2 sm:col-span-2">
+                  <div className="grid gap-2 sm:col-span-2" data-story-path={`lorebookEntries.${index}.sceneIds`}>
                     <span className="text-[11px] font-bold text-[#505652]">限定场景</span>
                     <div className="flex flex-wrap gap-1.5">
                       {draft.scenes.map((scene) => (
@@ -593,7 +594,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                   </div>
                 )}
                 {entry.scope === 'character' && (
-                  <div className="grid gap-2 sm:col-span-2">
+                  <div className="grid gap-2 sm:col-span-2" data-story-path={`lorebookEntries.${index}.characterIds`}>
                     <span className="text-[11px] font-bold text-[#505652]">限定人物</span>
                     <div className="flex flex-wrap gap-1.5">
                       {draft.characters.map((character) => (
@@ -619,7 +620,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                   </div>
                 )}
                 {entry.scope === 'chapter' && (
-                  <label>
+                  <label data-story-path={`lorebookEntries.${index}.chapterNumbers`}>
                     <span>章节序号（逗号分隔）</span>
                     <input
                       value={entry.chapterNumbers.join(', ')}
@@ -634,7 +635,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                     />
                   </label>
                 )}
-                <label className="sm:col-span-2">
+                <label className="sm:col-span-2" data-story-path={`lorebookEntries.${index}.content`}>
                   <span>资料内容</span>
                   <textarea
                     rows={4}
@@ -654,7 +655,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
         </div>
       </div>
 
-      <div>
+      <div data-story-path="nodes">
         <EditorSectionHeader
           kicker="08 · 节点"
           title="哪些剧情节点会被当前状态触发？"
@@ -667,7 +668,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                   ...draft,
                   nodes: [
                     ...draft.nodes,
-                    { id: crypto.randomUUID(), title: '', description: '', condition: {}, prompt: '', enabled: true },
+                    { id: createUuid(), title: '', description: '', condition: {}, prompt: '', enabled: true },
                   ],
                 })
               }
@@ -679,7 +680,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
         {draft.nodes.length === 0 && <div className={emptyStateClass(true)}>还没有故事节点。</div>}
         <div className="grid gap-[13px]">
           {draft.nodes.map((node, index) => (
-            <article className={editorItemClass} key={node.id}>
+            <article className={editorItemClass} data-story-path={`nodes.${index}`} key={node.id}>
               <header className={editorItemHeaderClass}>
                 <span>{String(index + 1).padStart(2, '0')}</span>
                 <strong>{node.title || '未命名节点'}</strong>
@@ -696,11 +697,11 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                 </button>
               </header>
               <div className={editorFormGridClass}>
-                <label>
+                <label data-story-path={`nodes.${index}.title`}>
                   <span>标题</span>
                   <input value={node.title} onChange={(event) => updateNode(index, { title: event.target.value })} />
                 </label>
-                <label className="!flex !flex-row !items-center !gap-2">
+                <label className="!flex !flex-row !items-center !gap-2" data-story-path={`nodes.${index}.enabled`}>
                   <input
                     className="!min-h-[17px] !w-[17px] accent-green"
                     type="checkbox"
@@ -709,7 +710,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                   />
                   <span>启用</span>
                 </label>
-                <label className="sm:col-span-2">
+                <label className="sm:col-span-2" data-story-path={`nodes.${index}.description`}>
                   <span>说明</span>
                   <textarea
                     rows={3}
@@ -723,7 +724,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                   rows={4}
                   onValidChange={(condition) => updateNode(index, { condition })}
                 />
-                <label className="sm:col-span-2">
+                <label className="sm:col-span-2" data-story-path={`nodes.${index}.prompt`}>
                   <span>节点提示</span>
                   <textarea
                     rows={4}
@@ -737,7 +738,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
         </div>
       </div>
 
-      <div>
+      <div data-story-path="declarativeMods">
         <EditorSectionHeader
           kicker="09 · 声明式 MOD"
           title="哪些轻量扩展随故事启用？"
@@ -751,7 +752,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                   declarativeMods: [
                     ...draft.declarativeMods,
                     {
-                      id: crypto.randomUUID(),
+                      id: createUuid(),
                       name: '',
                       version: '1.0.0',
                       description: '',
@@ -771,7 +772,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
         {draft.declarativeMods.length === 0 && <div className={emptyStateClass(true)}>还没有声明式 MOD。</div>}
         <div className="grid gap-[13px]">
           {draft.declarativeMods.map((mod, index) => (
-            <article className={editorItemClass} key={mod.id}>
+            <article className={editorItemClass} data-story-path={`declarativeMods.${index}`} key={mod.id}>
               <header className={editorItemHeaderClass}>
                 <span>{String(index + 1).padStart(2, '0')}</span>
                 <strong>{mod.name || '未命名 MOD'}</strong>
@@ -791,21 +792,21 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                 </button>
               </header>
               <div className={editorFormGridClass}>
-                <label>
+                <label data-story-path={`declarativeMods.${index}.name`}>
                   <span>名称</span>
                   <input
                     value={mod.name}
                     onChange={(event) => updateDeclarativeMod(index, { name: event.target.value })}
                   />
                 </label>
-                <label>
+                <label data-story-path={`declarativeMods.${index}.version`}>
                   <span>版本</span>
                   <input
                     value={mod.version}
                     onChange={(event) => updateDeclarativeMod(index, { version: event.target.value })}
                   />
                 </label>
-                <label className="sm:col-span-2">
+                <label className="sm:col-span-2" data-story-path={`declarativeMods.${index}.description`}>
                   <span>说明</span>
                   <textarea
                     rows={3}
@@ -813,7 +814,10 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                     onChange={(event) => updateDeclarativeMod(index, { description: event.target.value })}
                   />
                 </label>
-                <label className="!flex !flex-row !items-center !gap-2 sm:col-span-2">
+                <label
+                  className="!flex !flex-row !items-center !gap-2 sm:col-span-2"
+                  data-story-path={`declarativeMods.${index}.enabledByDefault`}
+                >
                   <input
                     className="!min-h-[17px] !w-[17px] accent-green"
                     type="checkbox"
@@ -834,7 +838,7 @@ export function StateStructureBlock({ draft, onChange }: StateStructureBlockProp
                   rows={4}
                   onValidChange={(defaultConfig) => updateDeclarativeMod(index, { defaultConfig })}
                 />
-                <label className="sm:col-span-2">
+                <label className="sm:col-span-2" data-story-path={`declarativeMods.${index}.prompt`}>
                   <span>提示词贡献</span>
                   <textarea
                     rows={4}

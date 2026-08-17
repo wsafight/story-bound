@@ -133,5 +133,19 @@ export function createStoryDraftSchema(options: ContractSchemaOptions = defaultC
   })
 }
 
+export function createGenerateStoryDraftSchema(options: ContractSchemaOptions = defaultContractOptions) {
+  return z.object({
+    prompt: z.string().trim().min(1).max(500),
+    intent: z.enum(['draft', 'complete', 'repair', 'opening', 'conflict']).default('draft'),
+    baseDraft: createStoryDraftSchema(options)
+      .extend({
+        title: z.string().trim().max(120).default(''),
+      })
+      .optional(),
+  })
+}
+
 export const storyDraftSchema = createStoryDraftSchema()
+export const generateStoryDraftSchema = createGenerateStoryDraftSchema()
 export type StoryDraftInput = z.infer<typeof storyDraftSchema>
+export type GenerateStoryDraftInput = z.infer<typeof generateStoryDraftSchema>

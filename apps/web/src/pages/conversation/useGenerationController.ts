@@ -19,6 +19,7 @@ import {
 import { post } from '../../app/apiClient'
 import { apiQueryOptions } from '../../app/apiQueries'
 import { type StreamEvent, streamPost } from '../../app/sseClient'
+import { createUuid } from '../../shared/id'
 
 interface GenerationControllerOptions {
   conversation: Conversation | null
@@ -194,8 +195,8 @@ export function useGenerationController({
     onFollowLatest()
     if (editing) {
       await runStream(apiPaths.editAndRetry(editing.id), {
-        operationId: crypto.randomUUID(),
-        clientMessageId: crypto.randomUUID(),
+        operationId: createUuid(),
+        clientMessageId: createUuid(),
         expectedLeafMessageId: conversation.activeLeafMessageId,
         content,
         inputMode: currentMode,
@@ -203,7 +204,7 @@ export function useGenerationController({
       return
     }
     await runStream(apiPaths.sendMessage(conversation.id), {
-      clientMessageId: crypto.randomUUID(),
+      clientMessageId: createUuid(),
       expectedLeafMessageId: conversation.activeLeafMessageId,
       content,
       inputMode: currentMode,
@@ -243,7 +244,7 @@ export function useGenerationController({
   async function regenerate() {
     if (!conversation) return
     await runStream(apiPaths.regenerate(conversation.id), {
-      operationId: crypto.randomUUID(),
+      operationId: createUuid(),
       expectedLeafMessageId: conversation.activeLeafMessageId,
     })
   }
